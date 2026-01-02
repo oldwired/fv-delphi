@@ -1,0 +1,1356 @@
+program FVTest;
+
+{$APPTYPE CONSOLE}
+
+uses
+  System.SysUtils,
+  Objects in 'src\Objects.pas',
+  Video in 'src\Video.pas',
+  Drivers in 'src\Drivers.pas',
+  Views in 'src\Views.pas',
+  Menus in 'src\Menus.pas',
+  HistList in 'src\histlist.pas',
+  fvconsts in 'src\fvconsts.pas',
+  App in 'src\app.pas',
+  FVCommon in 'src\FVCommon.pas',
+  Validate in 'src\Validate.pas',
+  Dialogs in 'src\Dialogs.pas',
+  MsgBox in 'src\MsgBox.pas',
+  StdDlg in 'src\StdDlg.pas',
+  ColorTxt in 'src\ColorTxt.pas',
+  Time in 'src\Time.pas',
+  Gadgets in 'src\Gadgets.pas',
+  InpLong in 'src\InpLong.pas',
+  AsciiTab in 'src\AsciiTab.pas',
+  TimedDlg in 'src\TimedDlg.pas',
+  Tabs in 'src\Tabs.pas',
+  Statuses in 'src\Statuses.pas',
+  ColorSel in 'src\ColorSel.pas',
+  Outline in 'src\Outline.pas',
+  Editors in 'src\Editors.pas';
+
+const
+  cmNewWindow = 100;
+  cmTestWindow1 = 1001;
+  cmTestWindow2 = 1002;
+  cmTestDialog = 1003;
+  cmTestScroller = 1004;
+  cmTestMsgBox = 1005;
+  cmTestInputBox = 1006;
+  cmTestFileOpen = 1007;
+  cmTestChDir = 1008;
+  cmTestColoredText = 1009;
+  cmTestInputLong = 1010;
+  cmTestAsciiChart = 1011;
+  cmTestTimedDlg = 1012;
+  cmTestTabs = 1013;
+  cmAddTab = 1014;
+  cmRemoveTab = 1015;
+  cmTestStatuses = 1016;
+  cmUpdateGauge = 1017;
+  cmTestColors = 1018;
+  cmTestOutline = 1019;
+  cmTestEditor = 1020;
+  cmTestEditorFind = 1021;
+  cmTestEditorFile = 1022;
+  cmTestEditorClipboard = 1023;
+
+var
+  ExceptionLog: TextFile;
+  ExceptionLogOpen: Boolean = False;
+  IdleCounter: Integer = 0;
+  LastSecond: Word = 65535;
+  ClockView: PClockView = nil;
+  HeapView: PHeapView = nil;
+
+procedure LogException(const Context: string; E: Exception);
+begin
+  if not ExceptionLogOpen then begin
+    AssignFile(ExceptionLog, 'fvtest.log');
+    Rewrite(ExceptionLog);
+    ExceptionLogOpen := True;
+  end;
+  WriteLn(ExceptionLog, FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now),
+          ' EXCEPTION in ', Context, ': ', E.ClassName, ' - ', E.Message);
+  Flush(ExceptionLog);
+end;
+
+type
+  PMyStatusLine = ^TMyStatusLine;
+  TMyStatusLine = object(TStatusLine)
+    function Hint(AHelpCtx: Word): ShortString; virtual;
+  end;
+
+  PMyApp = ^TMyApp;
+  TMyApp = object(TApplication)
+    constructor Init;
+    procedure InitMenuBar; virtual;
+    procedure InitStatusLine; virtual;
+    procedure HandleEvent(var Event: TEvent); virtual;
+    procedure Idle; virtual;
+    procedure NewWindow;
+    procedure TestWindow1;
+    procedure TestWindow2;
+    procedure TestDialog;
+    procedure TestScroller;
+    procedure TestMsgBox;
+    procedure TestInputBox;
+    procedure TestFileOpen;
+    procedure TestChDir;
+    procedure TestColoredText;
+    procedure TestInputLong;
+    procedure TestAsciiChart;
+    procedure TestTimedDlg;
+    procedure TestTabs;
+    procedure TestStatuses;
+    procedure TestColors;
+    procedure TestOutline;
+    procedure TestEditor;
+    procedure TestEditorFind;
+    procedure TestEditorFile;
+    procedure TestEditorClipboard;
+  end;
+
+  { Custom scroller that displays numbered lines }
+  PTextScroller = ^TTextScroller;
+  TTextScroller = object(TScroller)
+    constructor Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+    procedure Draw; virtual;
+  end;
+
+  PMyWindow = ^TMyWindow;
+  TMyWindow = object(TWindow)
+    constructor Init(var Bounds: TRect; ATitle: ShortString; ANumber: Integer);
+  end;
+
+  { Custom dialog for testing dynamic tab add/remove }
+  PTabTestDialog = ^TTabTestDialog;
+  TTabTestDialog = object(TDialog)
+    TabCtrl: PTab;
+    TabCounter: Integer;
+    constructor Init(var Bounds: TRect; ATitle: ShortString);
+    procedure HandleEvent(var Event: TEvent); virtual;
+    procedure AddNewTab;
+    procedure RemoveCurrentTab;
+  end;
+
+var
+  MyApp: TMyApp;
+  WindowCount: Integer;
+
+function TMyStatusLine.Hint(AHelpCtx: Word): ShortString;
+begin
+  Result := ShortString(FormatDateTime('hh:nn:ss', Now));
+end;
+
+constructor TMyWindow.Init(var Bounds: TRect; ATitle: ShortString; ANumber: Integer);
+begin
+  inherited Init(Bounds, ATitle, ANumber);
+  Options := Options or ofTileable;
+end;
+
+{ TTabTestDialog }
+constructor TTabTestDialog.Init(var Bounds: TRect; ATitle: ShortString);
+begin
+  inherited Init(Bounds, ATitle);
+  TabCtrl := nil;
+  TabCounter := 3;  { We start with 3 tabs }
+end;
+
+procedure TTabTestDialog.HandleEvent(var Event: TEvent);
+begin
+  inherited HandleEvent(Event);
+  if Event.What = evCommand then begin
+    case Event.Command of
+      cmAddTab: begin
+        AddNewTab;
+        ClearEvent(Event);
+      end;
+      cmRemoveTab: begin
+        RemoveCurrentTab;
+        ClearEvent(Event);
+      end;
+    end;
+  end;
+end;
+
+procedure TTabTestDialog.AddNewTab;
+var
+  R: TRect;
+  NewInput: PInputLine;
+  TabDef: PTabDef;
+begin
+  if TabCtrl = nil then Exit;
+
+  Inc(TabCounter);
+
+  { Create a new input line for the new tab }
+  R.Assign(2, 4, 50, 5);
+  NewInput := New(PInputLine, Init(R, 40));
+
+  { Create the tab definition using Tabs.NewTabDef function }
+  TabDef := Tabs.NewTabDef('Tab ~' + ShortString(IntToStr(TabCounter)) + '~', NewInput,
+    Tabs.NewTabItem(NewInput, nil), nil);
+
+  { Add it to the tab control }
+  TabCtrl^.AddTab(TabDef);
+end;
+
+procedure TTabTestDialog.RemoveCurrentTab;
+begin
+  if TabCtrl = nil then Exit;
+  if TabCtrl^.TabCount > 1 then begin
+    TabCtrl^.RemoveTab(TabCtrl^.ActiveDef);
+    Dec(TabCounter);
+  end;
+end;
+
+{ TTextScroller - displays 100 lines of text for scrolling test }
+constructor TTextScroller.Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
+begin
+  inherited Init(Bounds, AHScrollBar, AVScrollBar);
+  Options := Options or ofFirstClick;
+  SetLimit(80, 100);  { 80 columns, 100 lines }
+  GrowMode := gfGrowHiX + gfGrowHiY;
+end;
+
+procedure TTextScroller.Draw;
+var
+  B: TDrawBuffer;
+  C: Byte;
+  I, J: Integer;
+  S: ShortString;
+begin
+  C := GetColor(1);  { Normal color }
+  for I := 0 to Size.Y - 1 do begin
+    MoveChar(B, ' ', C, Size.X);
+    J := Delta.Y + I;
+    if J < Limit.Y then begin
+      S := ShortString(Format('Line %3d: ', [J + 1]));
+      { Add some content to show horizontal scrolling }
+      S := S + 'The quick brown fox jumps over the lazy dog. ABCDEFGHIJKLMNOP';
+      if Delta.X < Length(S) then begin
+        MoveStr(B, Copy(S, Delta.X + 1, Size.X), C);
+      end;
+    end;
+    WriteLine(0, I, Size.X, 1, B);
+  end;
+end;
+
+constructor TMyApp.Init;
+var
+  R: TRect;
+begin
+  inherited Init;
+
+  { Add Clock view at top right of desktop }
+  if Desktop <> nil then begin
+    Desktop^.GetExtent(R);
+    R.A.X := R.B.X - 10;
+    R.A.Y := 0;
+    R.B.Y := 1;
+    ClockView := New(PClockView, Init(R));
+    Desktop^.Insert(ClockView);
+
+    { Add Heap view below clock }
+    Desktop^.GetExtent(R);
+    R.A.X := R.B.X - 12;
+    R.B.X := R.B.X - 1;
+    R.A.Y := 1;
+    R.B.Y := 2;
+    HeapView := New(PHeapView, InitKb(R));
+    Desktop^.Insert(HeapView);
+  end;
+end;
+
+procedure TMyApp.InitMenuBar;
+var
+  R: TRect;
+begin
+  GetExtent(R);
+  R.B.Y := R.A.Y + 1;
+  MenuBar := New(PMenuBar, Init(R, NewMenu(
+    NewSubMenu('~F~ile', hcNoContext, NewMenu(
+      NewItem('~N~ew', 'F4', kbF4, cmNewWindow, hcNoContext,
+      NewItem('~O~pen...', 'F3', kbF3, cmTestFileOpen, hcNoContext,
+      NewItem('Change ~D~ir...', '', kbNoKey, cmTestChDir, hcNoContext,
+      NewLine(
+      NewItem('E~x~it', 'Alt-X', kbAltX, cmQuit, hcNoContext, nil)))))),
+    NewSubMenu('~T~est', hcNoContext, NewMenu(
+      NewItem('Window ~1~ (Input+Radio)', '', kbNoKey, cmTestWindow1, hcNoContext,
+      NewItem('Window ~2~ (Checkboxes)', '', kbNoKey, cmTestWindow2, hcNoContext,
+      NewItem('Test ~D~ialog (Full)', '', kbNoKey, cmTestDialog, hcNoContext,
+      NewItem('~S~croller Test', '', kbNoKey, cmTestScroller, hcNoContext,
+      NewLine(
+      NewItem('~M~essageBox Test', '', kbNoKey, cmTestMsgBox, hcNoContext,
+      NewItem('~I~nputBox Test', '', kbNoKey, cmTestInputBox, hcNoContext,
+      NewLine(
+      NewItem('~C~olored Text', '', kbNoKey, cmTestColoredText, hcNoContext,
+      NewItem('Input~L~ong', '', kbNoKey, cmTestInputLong, hcNoContext,
+      NewItem('~A~SCII Chart', '', kbNoKey, cmTestAsciiChart, hcNoContext,
+      NewItem('~T~imed Dialog', '', kbNoKey, cmTestTimedDlg, hcNoContext,
+      NewItem('Ta~b~s', '', kbNoKey, cmTestTabs, hcNoContext,
+      NewItem('~S~tatuses', '', kbNoKey, cmTestStatuses, hcNoContext,
+      NewItem('~C~olors', '', kbNoKey, cmTestColors, hcNoContext,
+      NewItem('~O~utline', '', kbNoKey, cmTestOutline, hcNoContext,
+      NewSubMenu('~E~ditor', hcNoContext, NewMenu(
+        NewItem('~N~ew Editor', '', kbNoKey, cmTestEditor, hcNoContext,
+        NewItem('~F~ind/Replace', '', kbNoKey, cmTestEditorFind, hcNoContext,
+        NewItem('File ~L~oad/Save', '', kbNoKey, cmTestEditorFile, hcNoContext,
+        NewItem('~C~lipboard', '', kbNoKey, cmTestEditorClipboard, hcNoContext,
+        nil))))),
+      nil)))))))))))))))))),
+    NewSubMenu('~W~indow', hcNoContext, NewMenu(
+      NewItem('~T~ile', '', kbNoKey, cmTile, hcNoContext,
+      NewItem('~C~ascade', '', kbNoKey, cmCascade, hcNoContext,
+      NewItem('~N~ext', 'F6', kbF6, cmNext, hcNoContext,
+      NewItem('~P~revious', 'Shift-F6', kbShiftF6, cmPrev, hcNoContext,
+      NewItem('~C~lose', 'Alt-F3', kbAltF3, cmClose, hcNoContext, nil)))))),
+    nil))))));
+end;
+
+procedure TMyApp.InitStatusLine;
+var
+  R: TRect;
+begin
+  GetExtent(R);
+  R.A.Y := R.B.Y - 1;
+  StatusLine := New(PMyStatusLine, Init(R,
+    NewStatusDef(0, $FFFF,
+      NewStatusKey('~Alt-X~ Exit', kbAltX, cmQuit,
+      NewStatusKey('~F4~ New', kbF4, cmNewWindow,
+      NewStatusKey('~F10~ Menu', kbF10, cmMenu,
+      NewStatusKey('~Alt-F3~ Close', kbAltF3, cmClose, nil)))), nil)));
+end;
+
+procedure TMyApp.HandleEvent(var Event: TEvent);
+begin
+  try
+    inherited HandleEvent(Event);
+
+    if Event.What = evCommand then begin
+      case Event.Command of
+        cmNewWindow: NewWindow;
+        cmTestWindow1: TestWindow1;
+        cmTestWindow2: TestWindow2;
+        cmTestDialog: TestDialog;
+        cmTestScroller: TestScroller;
+        cmTestMsgBox: TestMsgBox;
+        cmTestInputBox: TestInputBox;
+        cmTestFileOpen: TestFileOpen;
+        cmTestChDir: TestChDir;
+        cmTestColoredText: TestColoredText;
+        cmTestInputLong: TestInputLong;
+        cmTestAsciiChart: TestAsciiChart;
+        cmTestTimedDlg: TestTimedDlg;
+        cmTestTabs: TestTabs;
+        cmTestStatuses: TestStatuses;
+        cmTestColors: TestColors;
+        cmTestOutline: TestOutline;
+        cmTestEditor: TestEditor;
+        cmTestEditorFind: TestEditorFind;
+        cmTestEditorFile: TestEditorFile;
+        cmTestEditorClipboard: TestEditorClipboard;
+      else
+        Exit;
+      end;
+      ClearEvent(Event);
+    end;
+  except
+    on E: Exception do LogException('TMyApp.HandleEvent', E);
+  end;
+end;
+
+procedure TMyApp.Idle;
+var
+  Hour, Min, Sec, MSec: Word;
+begin
+  try
+    Inc(IdleCounter);
+    DecodeTime(Now, Hour, Min, Sec, MSec);
+    if Sec <> LastSecond then begin
+      LastSecond := Sec;
+      if StatusLine <> nil then begin
+        StatusLine^.DrawView;
+      end;
+    end;
+
+    { Update gadgets }
+    if ClockView <> nil then ClockView^.Update;
+    if HeapView <> nil then HeapView^.Update;
+
+    inherited Idle;
+  except
+    on E: Exception do LogException('TMyApp.Idle', E);
+  end;
+end;
+
+procedure TMyApp.NewWindow;
+var
+  R: TRect;
+  Win: PMyWindow;
+begin
+  Inc(WindowCount);
+  R.Assign(0, 0, 40, 12);
+  R.Move((WindowCount mod 5) * 2, (WindowCount mod 5));
+  Win := New(PMyWindow, Init(R, 'Window ' + ShortString(IntToStr(WindowCount)), WindowCount));
+  if Desktop <> nil then Desktop^.Insert(Win);
+end;
+
+procedure TMyApp.TestWindow1;
+{ Window with input line, radio buttons, static text }
+var
+  R: TRect;
+  Win: PWindow;
+begin
+  R.Assign(5, 2, 40, 16);
+  Win := New(PWindow, Init(R, 'Test Window 1', wnNoNumber));
+  if Win <> nil then begin
+    Win^.Options := Win^.Options or ofTileable;
+
+    { Input line }
+    R.Assign(3, 2, 30, 3);
+    Win^.Insert(New(PStaticText, Init(R, 'Enter your name:')));
+    R.Assign(3, 3, 30, 4);
+    Win^.Insert(New(PInputLine, Init(R, 50)));
+
+    { Radio buttons }
+    R.Assign(3, 5, 20, 6);
+    Win^.Insert(New(PStaticText, Init(R, 'Select option:')));
+    R.Assign(3, 6, 25, 9);
+    Win^.Insert(New(PRadioButtons, Init(R,
+      NewSItem('Option ~A~',
+      NewSItem('Option ~B~',
+      NewSItem('Option ~C~', nil))))));
+
+    { Static text }
+    R.Assign(3, 10, 32, 12);
+    Win^.Insert(New(PStaticText, Init(R,
+      'This is a test window with input line and radio buttons.')));
+
+    Desktop^.Insert(Win);
+  end;
+end;
+
+procedure TMyApp.TestWindow2;
+{ Window with checkboxes }
+var
+  R: TRect;
+  Win: PWindow;
+begin
+  R.Assign(10, 2, 45, 18);  { Made window taller: 16 rows }
+  Win := New(PWindow, Init(R, 'Test Window 2', wnNoNumber));
+  if Win <> nil then begin
+    Win^.Options := Win^.Options or ofTileable;
+
+    { Checkboxes }
+    R.Assign(2, 1, 25, 2);
+    Win^.Insert(New(PStaticText, Init(R, 'Select features:')));
+    R.Assign(2, 2, 32, 7);  { 5 items need 5 rows }
+    Win^.Insert(New(PCheckBoxes, Init(R,
+      NewSItem('~E~nable logging',
+      NewSItem('~S~how warnings',
+      NewSItem('~A~uto-save',
+      NewSItem('~D~ebug mode',
+      NewSItem('~V~erbose output', nil))))))));
+
+    { Another group of checkboxes }
+    R.Assign(2, 8, 25, 9);
+    Win^.Insert(New(PStaticText, Init(R, 'Display options:')));
+    R.Assign(2, 9, 32, 12);  { 3 items need 3 rows }
+    Win^.Insert(New(PCheckBoxes, Init(R,
+      NewSItem('Show ~t~oolbar',
+      NewSItem('Show status~b~ar',
+      NewSItem('~F~ull screen', nil))))));
+
+    Desktop^.Insert(Win);
+  end;
+end;
+
+procedure TMyApp.TestDialog;
+{ Full dialog with buttons, listbox, input, checkboxes }
+var
+  R: TRect;
+  Dlg: PDialog;
+  ScrollBar: PScrollBar;
+  ListBox: PListBox;
+  List: PStringCollection;
+begin
+  R.Assign(5, 2, 70, 22);
+  Dlg := New(PDialog, Init(R, 'Test Dialog'));
+  if Dlg <> nil then begin
+
+    { Input line with label }
+    R.Assign(3, 2, 30, 3);
+    Dlg^.Insert(New(PStaticText, Init(R, 'Name:')));
+    R.Assign(10, 2, 35, 3);
+    Dlg^.Insert(New(PInputLine, Init(R, 80)));
+
+    { Another input line }
+    R.Assign(3, 4, 30, 5);
+    Dlg^.Insert(New(PStaticText, Init(R, 'Value:')));
+    R.Assign(10, 4, 35, 5);
+    Dlg^.Insert(New(PInputLine, Init(R, 80)));
+
+    { Checkboxes }
+    R.Assign(3, 6, 30, 10);
+    Dlg^.Insert(New(PCheckBoxes, Init(R,
+      NewSItem('Check ~1~',
+      NewSItem('Check ~2~',
+      NewSItem('Check ~3~', nil))))));
+
+    { Radio buttons }
+    R.Assign(3, 11, 30, 15);
+    Dlg^.Insert(New(PRadioButtons, Init(R,
+      NewSItem('Radio ~A~',
+      NewSItem('Radio ~B~',
+      NewSItem('Radio ~C~', nil))))));
+
+    { Scrollbar for listbox }
+    R.Assign(58, 6, 59, 15);
+    ScrollBar := New(PScrollBar, Init(R));
+    Dlg^.Insert(ScrollBar);
+
+    { Listbox }
+    R.Assign(38, 6, 58, 15);
+    ListBox := New(PListBox, Init(R, 1, ScrollBar));
+    Dlg^.Insert(ListBox);
+
+    { Create string collection for listbox }
+    List := New(PStringCollection, Init(15, 5));
+    List^.Insert(NewStr('Apple'));
+    List^.Insert(NewStr('Banana'));
+    List^.Insert(NewStr('Cherry'));
+    List^.Insert(NewStr('Date'));
+    List^.Insert(NewStr('Elderberry'));
+    List^.Insert(NewStr('Fig'));
+    List^.Insert(NewStr('Grape'));
+    List^.Insert(NewStr('Honeydew'));
+    List^.Insert(NewStr('Kiwi'));
+    List^.Insert(NewStr('Lemon'));
+    List^.Insert(NewStr('Mango'));
+    List^.Insert(NewStr('Nectarine'));
+    List^.Insert(NewStr('Orange'));
+    List^.Insert(NewStr('Papaya'));
+    List^.Insert(NewStr('Quince'));
+    ListBox^.NewList(List);
+
+    { Buttons }
+    R.Assign(10, 16, 22, 18);
+    Dlg^.Insert(New(PButton, Init(R, '~O~K', cmOK, bfDefault)));
+    R.Assign(26, 16, 38, 18);
+    Dlg^.Insert(New(PButton, Init(R, '~C~ancel', cmCancel, bfNormal)));
+    R.Assign(42, 16, 54, 18);
+    Dlg^.Insert(New(PButton, Init(R, '~H~elp', cmHelp, bfNormal)));
+
+    { Execute as modal dialog }
+    Desktop^.ExecView(Dlg);
+    Dispose(Dlg, Done);
+  end;
+end;
+
+procedure TMyApp.TestScroller;
+{ Window with scrollable content to test TScroller and scrollbars }
+var
+  R: TRect;
+  Win: PWindow;
+  Scroller: PTextScroller;
+  HScrollBar, VScrollBar: PScrollBar;
+begin
+  R.Assign(5, 2, 55, 20);
+  Win := New(PWindow, Init(R, 'Scroller Test', wnNoNumber));
+  if Win <> nil then begin
+    Win^.Options := Win^.Options or ofTileable;
+
+    { Create vertical scrollbar - inside the frame }
+    Win^.GetExtent(R);
+    R.A.X := R.B.X - 2;       { One column inside right border }
+    R.B.X := R.B.X - 1;       { Width = 1 }
+    R.A.Y := 1;               { Below title bar }
+    R.B.Y := R.B.Y - 2;       { Above bottom border and horizontal scrollbar }
+    VScrollBar := New(PScrollBar, Init(R));
+    VScrollBar^.GrowMode := gfGrowLoX + gfGrowHiX + gfGrowHiY;
+    Win^.Insert(VScrollBar);
+
+    { Create horizontal scrollbar - inside the frame }
+    Win^.GetExtent(R);
+    R.A.X := 1;               { Inside left border }
+    R.B.X := R.B.X - 2;       { Inside right border, before vertical scrollbar }
+    R.A.Y := R.B.Y - 2;       { One row above bottom border }
+    R.B.Y := R.B.Y - 1;       { Height = 1 }
+    HScrollBar := New(PScrollBar, Init(R));
+    HScrollBar^.GrowMode := gfGrowLoY + gfGrowHiY + gfGrowHiX;
+    Win^.Insert(HScrollBar);
+
+    { Create the scroller interior }
+    Win^.GetExtent(R);
+    R.A.X := 1;               { Inside left border }
+    R.A.Y := 1;               { Below title bar }
+    R.B.X := R.B.X - 2;       { Before vertical scrollbar }
+    R.B.Y := R.B.Y - 2;       { Above horizontal scrollbar }
+    Scroller := New(PTextScroller, Init(R, HScrollBar, VScrollBar));
+    Win^.Insert(Scroller);
+
+    Desktop^.Insert(Win);
+  end;
+end;
+
+procedure TMyApp.TestMsgBox;
+begin
+  { Test Warning message }
+  MessageBox('This is a warning message.', nil, mfWarning + mfOKButton);
+
+  { Test Error message with OK/Cancel }
+  MessageBox('An error has occurred!'#13#10'Do you want to continue?',
+    nil, mfError + mfOKCancel);
+
+  { Test Information message }
+  MessageBox('This is an information message.'#13#10 +
+    'It can have multiple lines.', nil, mfInformation + mfOKButton);
+
+  { Test Confirmation with Yes/No/Cancel }
+  MessageBox('Do you want to save changes before exiting?',
+    nil, mfConfirmation + mfYesNoCancel);
+end;
+
+procedure TMyApp.TestInputBox;
+var
+  Result: Word;
+  UserInput: string;
+begin
+  UserInput := 'Default Value';
+  Result := InputBox('Enter Value', '~V~alue:', UserInput, 50);
+  if Result = cmOK then
+    MessageBox('You entered: ' + UserInput, nil, mfInformation + mfOKButton)
+  else
+    MessageBox('Input was cancelled.', nil, mfInformation + mfOKButton);
+end;
+
+procedure TMyApp.TestFileOpen;
+var
+  Dlg: PFileDialog;
+  FileName: PathStr;
+  C: Word;
+begin
+  FileName := '';
+  try
+    Dlg := New(PFileDialog, Init('*.*', 'Open File', '~N~ame', fdOpenButton + fdHelpButton, 1));
+  except
+    on E: Exception do begin
+      LogException('TestFileOpen.Init', E);
+      Exit;
+    end;
+  end;
+  if Dlg <> nil then begin
+    try
+      C := Desktop^.ExecView(Dlg);
+    except
+      on E: Exception do begin
+        LogException('TestFileOpen.ExecView', E);
+        Dispose(Dlg, Done);
+        Exit;
+      end;
+    end;
+    if C <> cmCancel then begin
+      try
+        Dlg^.GetData(FileName);
+      except
+        on E: Exception do begin
+          LogException('TestFileOpen.GetData', E);
+          Dispose(Dlg, Done);
+          Exit;
+        end;
+      end;
+    end;
+    try
+      Dispose(Dlg, Done);
+    except
+      on E: Exception do begin
+        LogException('TestFileOpen.Dispose', E);
+        Exit;
+      end;
+    end;
+    if C = cmFileOpen then
+      MessageBox('Selected file: ' + FileName, nil, mfInformation + mfOKButton);
+  end;
+end;
+
+procedure TMyApp.TestChDir;
+var
+  Dlg: PChDirDialog;
+begin
+  Dlg := New(PChDirDialog, Init(cdNormal, 2));
+  if Dlg <> nil then begin
+    if ExecuteDialog(Dlg, nil) = cmOK then
+      MessageBox('Directory changed successfully.', nil, mfInformation + mfOKButton);
+  end;
+end;
+
+procedure TMyApp.TestColoredText;
+{ Window with colored static text examples }
+var
+  R: TRect;
+  Win: PWindow;
+begin
+  R.Assign(5, 2, 50, 16);
+  Win := New(PWindow, Init(R, 'Colored Text Test', wnNoNumber));
+  if Win <> nil then begin
+    Win^.Options := Win^.Options or ofTileable;
+
+    { Normal static text for comparison }
+    R.Assign(2, 1, 40, 2);
+    Win^.Insert(New(PStaticText, Init(R, 'Normal static text (palette color)')));
+
+    { Red text on black: $04 = red foreground, black background }
+    R.Assign(2, 3, 40, 4);
+    Win^.Insert(New(PColoredText, Init(R, 'Red text on black background', $04)));
+
+    { Yellow text on blue: $1E = blue bg (1), yellow fg (E) }
+    R.Assign(2, 5, 40, 6);
+    Win^.Insert(New(PColoredText, Init(R, 'Yellow text on blue background', $1E)));
+
+    { White text on red: $4F = red bg (4), bright white fg (F) }
+    R.Assign(2, 7, 40, 8);
+    Win^.Insert(New(PColoredText, Init(R, 'White text on red background', $4F)));
+
+    { Green text on black: $0A = green foreground }
+    R.Assign(2, 9, 40, 10);
+    Win^.Insert(New(PColoredText, Init(R, 'Bright green text', $0A)));
+
+    { Cyan on black: $0B }
+    R.Assign(2, 11, 40, 12);
+    Win^.Insert(New(PColoredText, Init(R, 'Cyan colored text', $0B)));
+
+    Desktop^.Insert(Win);
+  end;
+end;
+
+procedure TMyApp.TestInputLong;
+{ Dialog with TInputLong for numeric input }
+var
+  R: TRect;
+  Dlg: PDialog;
+  InputLine: PInputLong;
+  Value: LongInt;
+begin
+  R.Assign(10, 4, 60, 18);
+  Dlg := New(PDialog, Init(R, 'InputLong Test'));
+  if Dlg <> nil then begin
+    { Label and input for positive number }
+    R.Assign(3, 2, 30, 3);
+    Dlg^.Insert(New(PStaticText, Init(R, 'Enter a number (0-1000):')));
+    R.Assign(3, 3, 20, 4);
+    InputLine := New(PInputLong, Init(R, 10, 0, 1000, 0));
+    Dlg^.Insert(InputLine);
+
+    { Label and input for signed number }
+    R.Assign(3, 5, 35, 6);
+    Dlg^.Insert(New(PStaticText, Init(R, 'Enter signed (-100 to 100):')));
+    R.Assign(3, 6, 20, 7);
+    Dlg^.Insert(New(PInputLong, Init(R, 10, -100, 100, 0)));
+
+    { Label and input for hex number }
+    R.Assign(3, 8, 35, 9);
+    Dlg^.Insert(New(PStaticText, Init(R, 'Enter hex ($0-$FF, use $):')));
+    R.Assign(3, 9, 20, 10);
+    Dlg^.Insert(New(PInputLong, Init(R, 10, 0, 255, ilHex or ilDisplayHex)));
+
+    { Buttons }
+    R.Assign(10, 11, 22, 13);
+    Dlg^.Insert(New(PButton, Init(R, '~O~K', cmOK, bfDefault)));
+    R.Assign(26, 11, 38, 13);
+    Dlg^.Insert(New(PButton, Init(R, 'Cancel', cmCancel, bfNormal)));
+
+    Dlg^.SelectNext(False);
+
+    { Set initial value }
+    Value := 42;
+    InputLine^.SetData(Value);
+
+    if Desktop^.ExecView(Dlg) = cmOK then begin
+      InputLine^.GetData(Value);
+      MessageBox('First value entered: ' + IntToStr(Value), nil, mfInformation + mfOKButton);
+    end;
+    Dispose(Dlg, Done);
+  end;
+end;
+
+procedure TMyApp.TestAsciiChart;
+{ Open ASCII Chart window }
+var
+  Chart: PASCIIChart;
+begin
+  Chart := New(PASCIIChart, Init);
+  if Chart <> nil then begin
+    { Center the window }
+    Chart^.MoveTo(
+      (Desktop^.Size.X - Chart^.Size.X) div 2,
+      (Desktop^.Size.Y - Chart^.Size.Y) div 2);
+    Desktop^.Insert(Chart);
+  end;
+end;
+
+procedure TMyApp.TestTimedDlg;
+{ Test timed message box that auto-closes after countdown }
+begin
+  { Show a timed message box that closes after 5 seconds }
+  TimedMessageBox(
+    'This message will close automatically in 5 seconds.'#13#10 +
+    'Or click a button to close it now.',
+    nil,
+    mfInformation + mfOKCancel,
+    5);
+end;
+
+procedure TMyApp.TestTabs;
+{ Test tabbed dialog with multiple tabs and dynamic add/remove }
+var
+  R: TRect;
+  Dlg: PTabTestDialog;
+  Tab: PTab;
+  Input1, Input2, Input3: PInputLine;
+  Check1: PCheckBoxes;
+  Radio1: PRadioButtons;
+begin
+  R.Assign(5, 2, 65, 22);  { Made taller for extra buttons }
+  Dlg := New(PTabTestDialog, Init(R, 'Tabbed Dialog Test'));
+  if Dlg <> nil then begin
+    { Note: Inside TTab, content area starts at row 3 (after tab header) }
+    { and column 1 (inside left border), ending at Size.X-2, Size.Y-2 }
+
+    { Tab 1: General settings - views positioned relative to TTab origin }
+    { Content area: rows 3-11, columns 1-52 }
+    R.Assign(2, 4, 50, 5);  { Row 4 inside tab = visible in content area }
+    Input1 := New(PInputLine, Init(R, 40));
+
+    { Tab 2: Advanced options }
+    R.Assign(2, 4, 50, 5);
+    Input2 := New(PInputLine, Init(R, 40));
+    R.Assign(2, 6, 40, 10);
+    Check1 := New(PCheckBoxes, Init(R,
+      NewSItem('~E~nable feature A',
+      NewSItem('~D~ebug mode',
+      NewSItem('~V~erbose logging', nil)))));
+
+    { Tab 3: Display settings }
+    R.Assign(2, 4, 50, 5);
+    Input3 := New(PInputLine, Init(R, 40));
+    R.Assign(2, 6, 35, 10);
+    Radio1 := New(PRadioButtons, Init(R,
+      NewSItem('~S~mall',
+      NewSItem('~M~edium',
+      NewSItem('~L~arge', nil)))));
+
+    { Create tab control with 3 tabs }
+    R.Assign(2, 1, 56, 14);
+    Tab := New(PTab, Init(R,
+      NewTabDef('~G~eneral', Input1,
+        NewTabItem(Input1, nil),
+      NewTabDef('~A~dvanced', Input2,
+        NewTabItem(Input2,
+        NewTabItem(Check1, nil)),
+      NewTabDef('~D~isplay', Input3,
+        NewTabItem(Input3,
+        NewTabItem(Radio1, nil)),
+      nil)))));
+    Dlg^.Insert(Tab);
+    Dlg^.TabCtrl := Tab;  { Store reference for Add/Remove handlers }
+
+    { Add Tab / Remove Tab buttons }
+    R.Assign(2, 15, 16, 17);
+    Dlg^.Insert(New(PButton, Init(R, '~+~ Add Tab', cmAddTab, bfNormal)));
+    R.Assign(18, 15, 36, 17);
+    Dlg^.Insert(New(PButton, Init(R, '~-~ Remove Tab', cmRemoveTab, bfNormal)));
+
+    { OK / Cancel buttons }
+    R.Assign(38, 15, 48, 17);
+    Dlg^.Insert(New(PButton, Init(R, '~O~K', cmOK, bfDefault)));
+    R.Assign(50, 15, 58, 17);
+    Dlg^.Insert(New(PButton, Init(R, 'Cancel', cmCancel, bfNormal)));
+
+    { Don't call SelectNext - Tab is already Current and should have focus }
+    { Dlg^.SelectNext(False); }
+
+    Desktop^.ExecView(Dlg);
+    Dispose(Dlg, Done);
+  end;
+end;
+
+procedure TMyApp.TestStatuses;
+{ Comprehensive test for Status/Gauge views from Statuses.pas }
+var
+  R: TRect;
+  Dlg: PDialog;
+  BarGauge: PBarGauge;
+  PercentGauge: PPercentGauge;
+  ArrowGaugeR, ArrowGaugeL: PArrowGauge;
+  SpinnerGauge: PSpinnerGauge;
+  UpdateBtn, ResetBtn: PButton;
+  Event: TEvent;
+  Finished: Boolean;
+begin
+
+  { Create a dialog to hold all the gauge types }
+  R.Assign(10, 3, 70, 22);
+  Dlg := New(PDialog, Init(R, 'Status/Gauge Demo'));
+  if Dlg = nil then Exit;
+
+  { Label and Bar Gauge (progress bar with percentage) }
+  R.Assign(2, 2, 20, 3);
+  Dlg^.Insert(New(PStaticText, Init(R, 'Bar Gauge:')));
+  R.Assign(2, 3, 56, 4);
+  BarGauge := New(PBarGauge, Init(R, cmUpdateGauge, 0, 100));
+  BarGauge^.Current := 35;
+  Dlg^.Insert(BarGauge);
+
+  { Label and Percent Gauge }
+  R.Assign(2, 5, 20, 6);
+  Dlg^.Insert(New(PStaticText, Init(R, 'Percent Gauge:')));
+  R.Assign(22, 5, 36, 6);
+  PercentGauge := New(PPercentGauge, Init(R, cmUpdateGauge, 0, 100));
+  PercentGauge^.Current := 35;
+  Dlg^.Insert(PercentGauge);
+
+  { Label and Arrow Gauge (right-facing) }
+  R.Assign(2, 7, 25, 8);
+  Dlg^.Insert(New(PStaticText, Init(R, 'Arrow Gauge (Right):')));
+  R.Assign(2, 8, 56, 9);
+  ArrowGaugeR := New(PArrowGauge, Init(R, cmUpdateGauge, 0, 100, True));
+  ArrowGaugeR^.Current := 35;
+  Dlg^.Insert(ArrowGaugeR);
+
+  { Label and Arrow Gauge (left-facing) }
+  R.Assign(2, 10, 25, 11);
+  Dlg^.Insert(New(PStaticText, Init(R, 'Arrow Gauge (Left):')));
+  R.Assign(2, 11, 56, 12);
+  ArrowGaugeL := New(PArrowGauge, Init(R, cmUpdateGauge, 0, 100, False));
+  ArrowGaugeL^.Current := 35;
+  Dlg^.Insert(ArrowGaugeL);
+
+  { Label and Spinner Gauge }
+  R.Assign(2, 13, 20, 14);
+  Dlg^.Insert(New(PStaticText, Init(R, 'Spinner Gauge:')));
+  SpinnerGauge := New(PSpinnerGauge, Init(22, 13, cmUpdateGauge));
+  Dlg^.Insert(SpinnerGauge);
+
+  { Buttons }
+  R.Assign(2, 16, 18, 18);
+  UpdateBtn := New(PButton, Init(R, '~U~pdate +10', cmUpdateGauge, bfNormal));
+  Dlg^.Insert(UpdateBtn);
+
+  R.Assign(20, 16, 32, 18);
+  ResetBtn := New(PButton, Init(R, '~R~eset', cmNo, bfNormal));
+  Dlg^.Insert(ResetBtn);
+
+  R.Assign(44, 16, 56, 18);
+  Dlg^.Insert(New(PButton, Init(R, 'Close', cmOK, bfDefault)));
+
+  { Run the dialog with manual event loop for updates }
+  Dlg^.SetState(sfModal, True);
+  Desktop^.Insert(Dlg);
+  Dlg^.SetState(sfVisible, True);
+  Dlg^.DrawView;
+
+  Finished := False;
+  repeat
+    GetEvent(Event);
+
+    if Event.What = evCommand then begin
+      case Event.Command of
+        cmOK, cmCancel, cmClose: begin
+          Finished := True;
+          ClearEvent(Event);
+        end;
+        cmUpdateGauge: begin
+          { Increment all gauges by 10 }
+          if BarGauge^.Current + 10 <= BarGauge^.Max then
+            BarGauge^.Current := BarGauge^.Current + 10
+          else
+            BarGauge^.Current := BarGauge^.Max;
+          BarGauge^.DrawView;
+
+          if PercentGauge^.Current + 10 <= PercentGauge^.Max then
+            PercentGauge^.Current := PercentGauge^.Current + 10
+          else
+            PercentGauge^.Current := PercentGauge^.Max;
+          PercentGauge^.DrawView;
+
+          if ArrowGaugeR^.Current + 10 <= ArrowGaugeR^.Max then
+            ArrowGaugeR^.Current := ArrowGaugeR^.Current + 10
+          else
+            ArrowGaugeR^.Current := ArrowGaugeR^.Max;
+          ArrowGaugeR^.DrawView;
+
+          if ArrowGaugeL^.Current + 10 <= ArrowGaugeL^.Max then
+            ArrowGaugeL^.Current := ArrowGaugeL^.Current + 10
+          else
+            ArrowGaugeL^.Current := ArrowGaugeL^.Max;
+          ArrowGaugeL^.DrawView;
+
+          { Spinner cycles }
+          SpinnerGauge^.Update(nil);
+
+          ClearEvent(Event);
+        end;
+        cmNo: begin
+          { Reset all gauges }
+          BarGauge^.Current := 0;
+          BarGauge^.DrawView;
+          PercentGauge^.Current := 0;
+          PercentGauge^.DrawView;
+          ArrowGaugeR^.Current := 0;
+          ArrowGaugeR^.DrawView;
+          ArrowGaugeL^.Current := 0;
+          ArrowGaugeL^.DrawView;
+          ClearEvent(Event);
+        end;
+      end;
+    end;
+
+    if Event.What <> evNothing then
+      Dlg^.HandleEvent(Event);
+
+  until Finished;
+
+  Desktop^.Delete(Dlg);
+  Dispose(Dlg, Done);
+end;
+
+procedure TMyApp.TestColors;
+{ Test color selection dialog }
+var
+  Dlg: PColorDialog;
+  Groups: PColorGroup;
+  Pal: TPalette;
+  Result: Word;
+begin
+  { Build standard color groups }
+  Groups :=
+    ColorGroup('Desktop',
+      DesktopColorItems(nil),
+    ColorGroup('Menus',
+      MenuColorItems(nil),
+    ColorGroup('Dialogs/Windows',
+      DialogColorItems(dpGrayDialog, nil),
+    ColorGroup('Editor',
+      WindowColorItems(wpBlueWindow, nil),
+    nil))));
+
+  { Create the color dialog with empty palette }
+  Pal := '';
+  Dlg := New(PColorDialog, Init(Pal, Groups));
+
+  if Dlg <> nil then begin
+    { Execute the dialog }
+    Result := Desktop^.ExecView(Dlg);
+    if Result = cmOK then begin
+      { Get the modified palette }
+      Dlg^.GetData(Pal);
+      MessageBox('Colors dialog completed (OK)', nil, mfInformation + mfOKButton);
+    end;
+    Dispose(Dlg, Done);
+  end;
+end;
+
+procedure TMyApp.TestOutline;
+{ Test outline/tree view }
+var
+  R: TRect;
+  Win: PWindow;
+  OutlineView: POutline;
+  Root: PNode;
+  HScrollBar, VScrollBar: PScrollBar;
+begin
+  {
+    Build a sample tree structure:
+    Nature
+    +- Animals
+    |  +- Mammals
+    |  |  +- Dogs
+    |  |  |  +- German Shepherd
+    |  |  |  +- Labrador
+    |  |  |  +- Poodle
+    |  |  +- Cats
+    |  |     +- Siamese
+    |  |     +- Persian
+    |  |     +- Maine Coon
+    |  +- Birds
+    |     +- Eagle
+    |     +- Sparrow
+    |     +- Penguin
+    +- Plants
+       +- Trees
+       |  +- Oak
+       |  +- Pine
+       |  +- Maple
+       +- Flowers
+          +- Rose
+          +- Tulip
+          +- Daisy
+  }
+
+  { Build from leaves up, using NewNode(Text, Children, Next) }
+  Root := NewNode('Nature',
+    { First child: Animals }
+    NewNode('Animals',
+      { Children of Animals: Mammals (with its children) }
+      NewNode('Mammals',
+        { Children of Mammals: Dogs group }
+        NewNode('Dogs',
+          { Children of Dogs }
+          NewNode('German Shepherd', nil,
+          NewNode('Labrador', nil,
+          NewNode('Poodle', nil, nil))),
+          { Next sibling of Dogs: Cats }
+          NewNode('Cats',
+            { Children of Cats }
+            NewNode('Siamese', nil,
+            NewNode('Persian', nil,
+            NewNode('Maine Coon', nil, nil))),
+            nil)),  { No more siblings for Cats }
+        { Next sibling of Mammals: Birds }
+        NewNode('Birds',
+          { Children of Birds }
+          NewNode('Eagle', nil,
+          NewNode('Sparrow', nil,
+          NewNode('Penguin', nil, nil))),
+          nil)),  { No more siblings for Birds }
+      { Next sibling of Animals: Plants }
+      NewNode('Plants',
+        { Children of Plants: Trees }
+        NewNode('Trees',
+          { Children of Trees }
+          NewNode('Oak', nil,
+          NewNode('Pine', nil,
+          NewNode('Maple', nil, nil))),
+          { Next sibling of Trees: Flowers }
+          NewNode('Flowers',
+            { Children of Flowers }
+            NewNode('Rose', nil,
+            NewNode('Tulip', nil,
+            NewNode('Daisy', nil, nil))),
+            nil)),  { No more siblings for Flowers }
+        nil)),  { No more siblings for Plants }
+    nil);  { No siblings for Nature (root) }
+
+  { Create window with outline view }
+  R.Assign(5, 2, 50, 20);
+  Win := New(PWindow, Init(R, 'Outline Test', wnNoNumber));
+  if Win <> nil then begin
+    Win^.Options := Win^.Options or ofTileable;
+
+    { Create vertical scrollbar }
+    Win^.GetExtent(R);
+    R.A.X := R.B.X - 2;
+    R.B.X := R.B.X - 1;
+    R.A.Y := 1;
+    R.B.Y := R.B.Y - 1;
+    VScrollBar := New(PScrollBar, Init(R));
+    VScrollBar^.GrowMode := gfGrowLoX + gfGrowHiX + gfGrowHiY;
+    Win^.Insert(VScrollBar);
+
+    { Create horizontal scrollbar }
+    Win^.GetExtent(R);
+    R.A.X := 1;
+    R.B.X := R.B.X - 2;
+    R.A.Y := R.B.Y - 2;
+    R.B.Y := R.B.Y - 1;
+    HScrollBar := New(PScrollBar, Init(R));
+    HScrollBar^.GrowMode := gfGrowLoY + gfGrowHiY + gfGrowHiX;
+    Win^.Insert(HScrollBar);
+
+    { Create the outline view }
+    Win^.GetExtent(R);
+    R.A.X := 1;
+    R.A.Y := 1;
+    R.B.X := R.B.X - 2;
+    R.B.Y := R.B.Y - 2;
+    OutlineView := New(POutline, Init(R, HScrollBar, VScrollBar, Root));
+    OutlineView^.GrowMode := gfGrowHiX + gfGrowHiY;
+    Win^.Insert(OutlineView);
+
+    Desktop^.Insert(Win);
+  end else begin
+    { Clean up if window creation failed }
+    DisposeNode(Root);
+  end;
+end;
+
+procedure TMyApp.TestEditor;
+{ Test editor window - opens a new editor or edits a file }
+var
+  R: TRect;
+  Win: PEditWindow;
+begin
+  { Set up standard editor dialogs }
+  EditorDialog := StdEditorDialog;
+
+  Inc(WindowCount);
+  R.Assign(3, 2, 72, 22);
+  R.Move((WindowCount mod 4) * 2, (WindowCount mod 4));
+  Win := New(PEditWindow, Init(R, '', WindowCount));
+  if Win <> nil then
+    Desktop^.Insert(Win);
+end;
+
+procedure TMyApp.TestEditorFind;
+{ Test editor Find/Replace dialogs }
+var
+  R: TRect;
+  Win: PEditWindow;
+  Editor: PEditor;
+  TestText: AnsiString;
+begin
+  { Set up standard editor dialogs }
+  EditorDialog := StdEditorDialog;
+
+  Inc(WindowCount);
+  R.Assign(3, 2, 72, 22);
+  R.Move((WindowCount mod 4) * 2, (WindowCount mod 4));
+  Win := New(PEditWindow, Init(R, '', WindowCount));
+  if Win <> nil then begin
+    Desktop^.Insert(Win);
+
+    { Get the editor and insert test text }
+    Editor := Win^.Editor;
+    if Editor <> nil then begin
+      TestText := 'This is a test line.' + #13#10 +
+                  'Find this word: apple' + #13#10 +
+                  'Another line with apple here.' + #13#10 +
+                  'And more text follows.' + #13#10 +
+                  'Replace apple with orange.' + #13#10;
+      Editor^.InsertText(@TestText[1], Length(TestText), False);
+
+      { Now trigger Find dialog - user can test interactively }
+      { Press Ctrl+Q F to find, Ctrl+Q A to replace }
+      MessageBox('Editor opened with test text.'#13#10 +
+                 'Press Ctrl+Q F to Find'#13#10 +
+                 'Press Ctrl+Q A to Replace'#13#10 +
+                 'Try searching for "apple"',
+                 nil, mfInformation or mfOKButton);
+    end;
+  end;
+end;
+
+procedure TMyApp.TestEditorFile;
+{ Test editor File Load/Save operations }
+var
+  R: TRect;
+  Win: PEditWindow;
+  TestFileName: string;
+begin
+  { Set up standard editor dialogs }
+  EditorDialog := StdEditorDialog;
+
+  TestFileName := 'editor_test.txt';
+
+  { First, create an editor with a file }
+  Inc(WindowCount);
+  R.Assign(3, 2, 72, 22);
+  R.Move((WindowCount mod 4) * 2, (WindowCount mod 4));
+  Win := New(PEditWindow, Init(R, TestFileName, WindowCount));
+  if Win <> nil then begin
+    Desktop^.Insert(Win);
+
+    if Win^.Editor <> nil then begin
+      { Insert some test content }
+      if Win^.Editor^.BufLen = 0 then begin
+        { New file - add content }
+        var TestText: AnsiString := 'This is a test file.'#13#10 +
+                    'Line 2 of the test.'#13#10 +
+                    'Line 3 - save and reload to test.'#13#10;
+        Win^.Editor^.InsertText(@TestText[1], Length(TestText), False);
+      end;
+
+      MessageBox('Editor opened with file: ' + TestFileName + #13#10 +
+                 'Press Ctrl+K S to Save'#13#10 +
+                 'Press Ctrl+K F to Save As'#13#10 +
+                 'Press Ctrl+K D to Save and Close'#13#10 +
+                 'Edit the text and save to test file operations.',
+                 nil, mfInformation or mfOKButton);
+    end;
+  end;
+end;
+
+procedure TMyApp.TestEditorClipboard;
+{ Test editor Clipboard operations (Cut/Copy/Paste) }
+var
+  R: TRect;
+  Win1, Win2: PEditWindow;
+  ClipWin: PEditWindow;
+  Editor: PEditor;
+  TestText: AnsiString;
+  ClipR: TRect;
+begin
+  { Set up standard editor dialogs }
+  EditorDialog := StdEditorDialog;
+
+  { Create a clipboard editor (hidden or visible for testing) }
+  ClipR.Assign(0, 0, 40, 10);
+  ClipWin := New(PEditWindow, Init(ClipR, 'Clipboard', 0));
+  if ClipWin <> nil then begin
+    { Set the global clipboard }
+    Clipboard := ClipWin^.Editor;
+
+    { Create first editor with source text }
+    Inc(WindowCount);
+    R.Assign(2, 1, 40, 15);
+    Win1 := New(PEditWindow, Init(R, 'Source', WindowCount));
+    if Win1 <> nil then begin
+      Desktop^.Insert(Win1);
+      Editor := Win1^.Editor;
+      if Editor <> nil then begin
+        TestText := 'Source text for clipboard test.' + #13#10 +
+                    'Select this line and copy it.' + #13#10 +
+                    'Or cut this text to move it.' + #13#10 +
+                    'Then paste into the other window.' + #13#10;
+        Editor^.InsertText(@TestText[1], Length(TestText), False);
+      end;
+    end;
+
+    { Create second editor as destination }
+    Inc(WindowCount);
+    R.Assign(42, 1, 78, 15);
+    Win2 := New(PEditWindow, Init(R, 'Destination', WindowCount));
+    if Win2 <> nil then begin
+      Desktop^.Insert(Win2);
+      Editor := Win2^.Editor;
+      if Editor <> nil then begin
+        TestText := 'Paste text here:' + #13#10 + #13#10;
+        Editor^.InsertText(@TestText[1], Length(TestText), False);
+      end;
+    end;
+
+    R.Assign(0, 0, 50, 14);
+    R.Move((Desktop^.Size.X - R.B.X) div 2, (Desktop^.Size.Y - R.B.Y) div 2);
+    MessageBoxRect(R,
+               'Clipboard Test Instructions:'#13#10 +
+               #13#10 +
+               'In Source window:'#13#10 +
+               '  Select text: Shift+arrows'#13#10 +
+               '  Copy: Ctrl+Ins'#13#10 +
+               '  Cut: Shift+Del or Ctrl+K Y'#13#10 +
+               #13#10 +
+               'In Destination window:'#13#10 +
+               '  Paste: Shift+Ins or Ctrl+K C',
+               nil, mfInformation or mfOKButton);
+  end;
+end;
+
+begin
+  WindowCount := 0;
+  try
+    MyApp.Init;
+    MyApp.Run;
+    MyApp.Done;
+  except
+    on E: Exception do begin
+      LogException('Main', E);
+      WriteLn('Exception: ', E.Message);
+    end;
+  end;
+
+  { Close exception log if it was opened }
+  if ExceptionLogOpen then
+    CloseFile(ExceptionLog);
+end.

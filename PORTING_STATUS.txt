@@ -1,0 +1,364 @@
+Free Vision to Modern Delphi - Porting Status
+=============================================
+
+Target: Delphi 10.x/11.x/12.x (Windows 32/64-bit)
+Approach: Keep legacy OBJECT syntax, do not convert to CLASS
+
+Legend:
+  [X] = Fully ported and tested
+  [P] = Partially ported (some objects/features missing)
+  [C] = Created, needs compilation testing
+  [ ] = Not started
+
+==============================================================================
+CORE UNITS
+==============================================================================
+
+[X] platform.inc     - Compiler/platform detection defines
+[X] FVCommon.pas     - Common types (Sw_Word, Sw_String, etc.)
+[X] fvconsts.pas     - Constants and resource strings
+[X] Objects.pas      - Base object system, streams, collections
+    [X] TObject, TStream, TDosStream, TBufStream, TMemoryStream
+    [X] TCollection, TSortedCollection, TStringCollection
+    [X] NewStr, DisposeStr, RegisterType
+
+[X] Video.pas        - Video/screen output abstraction
+    [X] TVideoBuffer, screen writing, cursor control
+
+[X] Drivers.pas      - Low-level input drivers
+    [X] Keyboard handling (GetKeyEvent, PutKeyEvent)
+    [X] Mouse handling (mouse events, cursor)
+    [X] Event queue management
+    [X] System events (idle, resize)
+
+==============================================================================
+VIEW SYSTEM
+==============================================================================
+
+[X] Views.pas        - Core view hierarchy
+    [X] TPoint, TRect - Basic geometry
+    [X] TView - Base view object
+    [X] TGroup - Container for views
+    [X] TFrame - Window frame
+    [X] TScrollBar - Scroll bars
+    [X] TScroller - Scrollable view
+    [X] TListViewer - List display base
+    [X] TWindow - Standard window
+    [X] TBackground - Desktop background
+    [X] TDesktop - Desktop manager
+    [X] Command/state constants
+
+==============================================================================
+MENUS AND STATUS
+==============================================================================
+
+[X] Menus.pas        - Menu system
+    [X] TMenuView - Base menu view
+    [X] TMenuBar - Top menu bar
+    [X] TMenuBox - Popup menu box
+    [X] TStatusLine - Status bar
+    [X] TMenuItem, TMenu, TStatusDef, TStatusItem records
+    [X] NewMenu, NewItem, NewSubMenu, NewLine helpers
+    [X] NewStatusDef, NewStatusKey helpers
+
+==============================================================================
+APPLICATION
+==============================================================================
+
+[X] App.pas          - Application framework
+    [X] TProgram - Base program object
+    [X] TApplication - Full application with desktop
+    [X] Event loop, command handling
+    [X] Tile, Cascade window management
+
+[X] HistList.pas     - History list management
+    [X] History buffer
+    [X] HistoryAdd, HistoryStr, HistoryCount
+
+==============================================================================
+DIALOGS
+==============================================================================
+
+[X] Dialogs.pas      - Dialog boxes and controls
+    [X] TDialog - Modal/modeless dialog base
+    [X] TInputLine - Text input field
+    [X] TButton - Push button
+    [X] TCluster - Base for checkbox/radio groups
+    [X] TCheckBoxes - Checkbox group
+    [X] TRadioButtons - Radio button group
+    [X] TListBox - List box control
+    [X] TStaticText - Static text label
+    [X] TLabel - Label linked to control
+    [X] THistory - History dropdown for input lines
+    [X] THistoryViewer - History list viewer
+    [X] THistoryWindow - History popup window
+    [X] TParamText - Parameterized text
+    [ ] TMultiCheckBoxes - Multi-state checkboxes
+
+[X] Validate.pas     - Input validation
+    [X] TValidator - Base validator
+    [X] TPXPictureValidator - Picture format validator
+    [X] TFilterValidator - Character filter validator
+    [X] TRangeValidator - Numeric range validator
+    [X] TLookupValidator - Lookup table validator
+    [X] TStringLookupValidator - String lookup validator
+
+==============================================================================
+STANDARD DIALOGS (NEW - December 2025)
+==============================================================================
+
+[X] MsgBox.pas       - Message box helpers
+    [X] MessageBox, MessageBoxRect
+    [X] MessageBoxRectDlg
+    [X] InputBox, InputBoxRect
+
+[X] StdDlg.pas       - Standard dialogs
+    [X] TFileInputLine - File input with broadcast handling
+    [X] TFileCollection - Sorted file collection
+    [X] TSortedListBox - Sorted list box with search
+    [X] TFileList - File list view
+    [X] TFileInfoPane - File info display
+    [X] TFileHistory - File dialog history
+    [X] TFileDialog - File open/save dialog
+    [X] TDirEntry, TDirCollection - Directory data structures
+    [X] TDirListBox - Directory list view
+    [X] TChDirDialog - Change directory dialog
+    [X] TEditChDirDialog - Edit directory dialog
+    [X] TDirValidator - Directory path validator
+    [X] Helper functions (FExpand, FSplit, PathValid, DriveValid, etc.)
+
+==============================================================================
+PHASE 1 UNITS - COMPLETED (December 2025)
+==============================================================================
+
+[X] ColorTxt.pas     - Colored static text
+    [X] TColoredText - Colored text label (extends TStaticText)
+
+[X] InpLong.pas      - Long integer input
+    [X] TInputLong - Numeric input with range validation
+    [X] Hex input/display support (ilHex, ilDisplayHex flags)
+
+[X] Time.pas         - Time utility functions
+    [X] GetTime, SetTime - Windows API based
+    [X] CurrentMinuteOfDay, CurrentSecondOfDay, CurrentSec100OfDay
+    [X] MinutesToTime, SecondsToTime
+
+[X] Gadgets.pas      - Utility gadgets
+    [X] TClockView - Clock display (auto-updating)
+    [X] THeapView - Memory display (multiple modes: normal, comma, KB, MB)
+
+[X] ASCIITab.pas     - ASCII table dialog
+    [X] TTable - 32x8 character grid with keyboard/mouse navigation
+    [X] TReport - Character details view (decimal, hex)
+    [X] TASCIIChart - ASCII table window
+
+==============================================================================
+PHASE 2 UNITS - COMPLETED (December 2025)
+==============================================================================
+
+[X] TimedDlg.pas     - Timed dialogs
+    [X] TTimedDialog - Auto-closing dialog
+    [X] TTimedDialogText - Countdown text display
+    [X] TimedMessageBox, TimedMessageBoxRect - Helper functions
+
+[X] Tabs.pas         - Tab controls
+    [X] TTab - Tabbed group container
+    [X] TTabItem, TTabDef - Tab item records
+    [X] NewTabItem, NewTabDef, DisposeTabItem, DisposeTabDef helpers
+    [X] AddTab, RemoveTab - Dynamic tab management (Delphi port extensions)
+
+[X] Statuses.pas     - Status/progress views
+    [X] TStatus - Base status view
+    [X] TStatusDlg - Status dialog with optional buttons
+    [X] TStatusMessageDlg - Status dialog with message
+    [X] TGauge - Numerical gauge base
+    [X] TBarGauge - Progress bar with percentage
+    [X] TPercentGauge - Percentage display
+    [X] TArrowGauge - Arrow-based indicator
+    [X] TSpinnerGauge - Spinning animation
+    [X] TAppStatus - Application status view
+    Note: THeapMaxAvail/THeapMemAvail not ported (obsolete MemAvail/MaxAvail)
+
+[X] ColorSel.pas     - Color selection (January 2026)
+    [X] TColorItem, TColorGroup records
+    [X] TColorSelector - 16-color grid selector (4x4 foreground, 2x4 background)
+    [X] TMonoSelector - Monochrome selector
+    [X] TColorDisplay - Color preview display
+    [X] TColorGroupList - Color group list viewer
+    [X] TColorItemList - Color item list viewer
+    [X] TColorDialog - Main color selection dialog
+    [X] Helper functions (ColorItem, ColorGroup, DisposeColorItem, DisposeColorGroup)
+    [X] Standard builders (DesktopColorItems, MenuColorItems, DialogColorItems, WindowColorItems)
+
+[X] Outline.pas      - Outline/tree view (January 2026)
+    [X] TNode record and NewNode/DisposeNode helpers
+    [X] TOutlineViewer - Tree list viewer (base class)
+    [X] TOutline - Outline with TNode data
+    [X] Keyboard navigation (arrows, +/-, *)
+    [X] Mouse expand/collapse
+    Note: Uses explicit context passing instead of FPC get_caller_frame
+
+==============================================================================
+PHASE 3 UNITS - COMPLETED (January 2026)
+==============================================================================
+
+[X] Editors.pas      - Text editor components (January 2026)
+    [X] TIndicator - Line/column indicator
+    [X] TLineInfo - Line metadata management
+    [X] TEditor - Full text editor (gap buffer, selection, clipboard, undo)
+    [X] TMemo - Memo field (multi-line input)
+    [X] TFileEditor - File-based editor (load/save with backup)
+    [X] TEditWindow - Window containing TFileEditor
+    [X] Dialog helpers (CreateFindDialog, CreateReplaceDialog, etc.)
+    [X] String search (Boyer-Moore algorithm)
+    [X] WordStar-style keyboard commands
+    Note: ~2800 lines ported from FPC implementation
+
+==============================================================================
+NOT YET PORTED - OPTIONAL/MAY NOT BE NEEDED
+==============================================================================
+
+[ ] Memory.pas       - Memory management
+    [ ] Low memory detection
+    [ ] Safety pool management
+    (Likely not needed in modern Delphi - uses MemAvail/MaxAvail)
+
+[ ] Resource.pas     - Resource file handling
+    [ ] TResourceFile
+    [ ] TResourceCollection
+    [ ] TStrIndexRec, TStrIndex
+    (May not be needed - alternative approaches available)
+
+[ ] SysMsg.pas       - System message handling
+    [ ] TSystemMessage, TSystemEvent
+    [ ] InitSystemMsg, GetSystemEvent, PollSystemEvent
+    (Mostly stubs for Windows - minimal)
+
+==============================================================================
+TESTING STATUS
+==============================================================================
+
+[X] Basic application startup and shutdown
+[X] Menu bar display and navigation
+[X] Status line display
+[X] Window creation and display
+[X] Window close (Alt+F3)
+[X] Window switching (F6, Shift+F6)
+[X] Tile and Cascade commands
+[X] Dialog display and interaction
+[X] Input line editing
+[X] Button clicks
+[X] Checkbox/radio button selection
+[X] List box selection
+[X] Window scrolling (TScroller with scrollbar arrows, page, drag)
+[X] Window moving (title bar drag, TV keyboard-style)
+[X] Window resizing (corner drag, TV keyboard-style, hybrid mouse/keyboard mode)
+[X] Mouse click window activation
+[X] Mouse click control activation
+[X] Keyboard navigation (Tab between controls)
+[X] Arrow key navigation in clusters
+[X] Editor functionality (basic text editing, cursor, insert/delete)
+
+Phase 1 Unit Tests:
+[X] TColoredText - Multiple color attributes displayed correctly
+[X] TClockView - Auto-updating clock on desktop
+[X] THeapView - Memory display on desktop (KB mode)
+[X] TInputLong - Numeric input with range validation (0-1000, -100 to 100, hex)
+[X] TASCIIChart - ASCII table window with keyboard/mouse navigation
+
+Phase 2 Unit Tests:
+[X] TimedMessageBox - Auto-closing message box with countdown
+[X] TTab - Tabbed dialog with multiple tabs, dynamic add/remove
+[X] Statuses - Bar gauge, percent gauge, arrow gauge, spinner gauge
+[X] ColorSel - Color selection dialog with groups, selectors, and preview
+[X] Outline - Tree view with expand/collapse via keyboard (+/-/*) and mouse
+
+Phase 3 Unit Tests:
+[X] Editor - Text editing, cursor movement, insert/delete
+[X] Editor - Selection with mouse drag
+[X] Editor - Selection with Shift+arrow keys
+[X] Editor - Find/Replace dialogs (Test menu > Editor > Find/Replace)
+[X] Editor - File load/save (Test menu > Editor > File Load/Save)
+[X] Editor - Clipboard Cut/Copy/Paste (Test menu > Editor > Clipboard)
+[X] Editor - Window activation by mouse click
+
+==============================================================================
+KNOWN ISSUES
+==============================================================================
+
+1. Console window resize not handled (visual artifacts if console resized)
+
+2. Editor uses ANSI encoding - Umlauts and special characters don't display
+   correctly when files are saved/loaded with UTF-8 encoding (modern Notepad
+   default). Workaround: Use ANSI encoding in external editors.
+
+==============================================================================
+FUTURE ENHANCEMENTS (Priority Order)
+==============================================================================
+
+1. UTF-8 encoding support (HIGH PRIORITY)
+   - Required for REST/JSON payloads (API communication)
+   - Required for modern file interoperability
+   - Implementation:
+     * Add UTF8ToAnsi / AnsiToUTF8 conversion utilities
+     * TFileEditor: Detect UTF-8 BOM on load, convert on load/save
+     * Add encoding option to file dialogs
+     * Ensure JSON data is properly encoded/decoded for REST APIs
+
+2. Conversion Class-Syntax
+
+==============================================================================
+RECENT FIXES (December 2025)
+==============================================================================
+
+1. Scrollbar auto-repeat timing - Fixed 16-bit overflow in Drivers.pas
+   (AutoTicks, DownTicks, AutoDelay changed from Word to LongInt)
+
+2. TWindow.Zoom - Fixed logic to compare Size with MaxP instead of bounds
+   with ZoomRect (first zoom now works correctly)
+
+3. TFrame close/zoom buttons - Added visual buttons and click handling
+
+4. TView.DragView - Complete rewrite to match original FPC implementation:
+   - Mouse drag uses proper offset tracking
+   - Hybrid mode: click without drag enters keyboard mode
+   - Click and drag exits on mouse release
+   - Supports both move and resize modes
+
+==============================================================================
+RECENT FIXES (January 2026)
+==============================================================================
+
+1. TEditor.Search - Fixed Find/Replace to properly select found text
+   - Removed extra SetCurPtr call that was clearing selection
+   - Added "Whole Words Only" logic from FPC original
+
+2. TEditor clipboard operations - Fixed Cut/Copy/Paste:
+   - ClipCopy now clears clipboard before copying new content
+   - ClipCopy selects all clipboard content after copy for paste to work
+   - Added proper validation and debug logging
+
+3. TEditor Shift+arrow selection - Fixed selection with keyboard:
+   - Moved shift state check before ConvertEvent
+   - Added shift check for evCommand events (converted arrow keys)
+
+4. TGroup.HandleEvent - Fixed mouse click window activation:
+   - Reordered to call inherited TView.HandleEvent first (matches FPC)
+   - Clicking on background window now properly brings it to front
+
+5. StdEditorDialog error messages - Fixed filename display:
+   - Changed from PString (^ShortString) to PFNameStr (^string)
+   - Error dialogs now show correct filename instead of gibberish
+
+==============================================================================
+NOTES
+==============================================================================
+
+- Using Objects.PString (ShortString pointer) for compatibility with
+  NewStr/DisposeStr from Objects.pas
+- Sw_String = ShortString for FPC compatibility
+- THandle from Winapi.Windows for file handles
+- Range checking should be OFF ({$R-}) in units using pointer arithmetic
+- Video output uses Windows Console API
+
+==============================================================================
