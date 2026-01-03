@@ -149,6 +149,7 @@ end;
 constructor TOutlineViewer.Init(var Bounds: TRect; AHScrollBar, AVScrollBar: PScrollBar);
 begin
   inherited Init(Bounds, AHScrollBar, AVScrollBar);
+  Options := Options or ofFirstClick;
   Foc := 0;
   GrowMode := gfGrowHiX + gfGrowHiY;
 end;
@@ -355,6 +356,7 @@ procedure TOutlineViewer.Draw;
 var
   DC: TDrawContext;
   IC: TIterContext;
+  BlankStart, BlankCount, I: Integer;
 begin
   DC.Viewer := @Self;
   DC.CNormal := GetColor(4);
@@ -363,14 +365,32 @@ begin
   DC.CSelect := GetColor(3);
   DC.MaxPos := -1;
 
+  { Initialize draw buffer to avoid uninitialized memory }
+  FillChar(DC.B, SizeOf(DC.B), 0);
+
   IC.UserData := @DC;
   IC.Found := False;
   IC.ResultNode := nil;
 
   ForEach(DrawItemCallback, @IC);
 
-  MoveChar(DC.B, ' ', DC.CNormal, Size.X);
-  WriteLine(0, DC.MaxPos + 1 - Delta.Y, Size.X, Size.Y - (DC.MaxPos - Delta.Y), DC.B);
+  { Calculate blank lines to fill after last drawn item }
+  if DC.MaxPos >= Delta.Y then begin
+    { Some items were drawn - blank starts after last item }
+    BlankStart := DC.MaxPos - Delta.Y + 1;
+    BlankCount := Size.Y - BlankStart;
+  end else begin
+    { No items visible in current scroll position - clear entire area }
+    BlankStart := 0;
+    BlankCount := Size.Y;
+  end;
+
+  if BlankCount > 0 then begin
+    MoveChar(DC.B, ' ', DC.CNormal, Size.X);
+    { Must write one line at a time - TDrawBuffer only holds one row }
+    for I := 0 to BlankCount - 1 do
+      WriteLine(0, BlankStart + I, Size.X, 1, DC.B);
+  end;
 end;
 
 procedure TOutlineViewer.ExpandAll(Node: Pointer);

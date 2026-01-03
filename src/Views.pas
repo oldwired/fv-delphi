@@ -2104,7 +2104,11 @@ end;
 procedure TScrollBar.SetRange(AMin, AMax: Integer);
 begin
   Min := AMin;
-  Max := AMax;
+  { Ensure Max >= Min to prevent negative scroll values }
+  if AMax < AMin then
+    Max := AMin
+  else
+    Max := AMax;
   if Value < Min then Value := Min;
   if Value > Max then Value := Max;
   DrawView;

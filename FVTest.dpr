@@ -1170,6 +1170,9 @@ begin
     Win^.Insert(OutlineView);
 
     Desktop^.Insert(Win);
+
+    { Select the outline so it has keyboard focus - must be after window is inserted }
+    OutlineView^.Select;
   end else begin
     { Clean up if window creation failed }
     DisposeNode(Root);
