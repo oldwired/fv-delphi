@@ -384,16 +384,13 @@ begin
   { Fill with spaces in the field color }
   MoveChar(B, ' ', Color, Size.X);
 
-  { Always show brackets to indicate input field boundaries }
-  if CanScroll(-1) then
-    MoveChar(B[0], LeftArr, ArrowColor, 1)
-  else
-    MoveChar(B[0], '[', ArrowColor, 1);
-
+  { Show arrows only when content overflows }
   if CanScroll(1) then
-    MoveChar(B[Size.X - 1], RightArr, ArrowColor, 1)
-  else
-    MoveChar(B[Size.X - 1], ']', ArrowColor, 1);
+    MoveChar(B[Size.X - 1], RightArr, ArrowColor, 1);
+
+  if (State and sfFocused <> 0) and (Options and ofSelectable <> 0) then
+    if CanScroll(-1) then
+      MoveChar(B[0], LeftArr, ArrowColor, 1);
 
   { Draw the data text }
   if Data <> nil then begin
@@ -1688,7 +1685,7 @@ procedure THistory.Draw;
 var
   B: TDrawBuffer;
 begin
-  MoveCStr(B, #222'~'#25'~'#221, GetColor($0102));
+  MoveCStr(B, '[~v~]', GetColor($0102));
   WriteLine(0, 0, Size.X, Size.Y, B);
 end;
 
