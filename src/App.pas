@@ -231,22 +231,41 @@ end;
 procedure TDesktop.Tile(var R: TRect);
 var
   NumCols, NumRows, NumTileable, LeftOver, TileNum: Integer;
-  D: TPoint;
   V, L0: PView;
   NR: TRect;
+  PState: Word;
 
   function Tileable(P: PView): Boolean;
   begin
     Result := (P^.Options and ofTileable <> 0) and (P^.State and sfVisible <> 0);
   end;
 
-  function ISqrt(X: Integer): Integer;
+  function ISqr(X: Integer): Integer;
   var
-    C: Word;
+    I: Integer;
   begin
-    C := 0;
-    while (C + 1) * (C + 1) <= X do Inc(C);
-    Result := C;
+    I := 0;
+    repeat
+      Inc(I);
+    until I * I > X;
+    Result := I - 1;
+  end;
+
+  procedure MostEqualDivisors(N: Integer; var X, Y: Integer; FavorY: Boolean);
+  var
+    I: Integer;
+  begin
+    I := ISqr(N);
+    if (N mod I) <> 0 then
+      if (N mod (I + 1)) = 0 then Inc(I);
+    if I < (N div I) then I := N div I;
+    if FavorY then begin
+      X := N div I;
+      Y := I;
+    end else begin
+      Y := N div I;
+      X := I;
+    end;
   end;
 
   function DividerLoc(Lo, Hi, Num, Pos: Integer): Integer;
@@ -254,27 +273,26 @@ var
     Result := LongInt(LongInt(Hi - Lo) * Pos) div Num + Lo;
   end;
 
-  procedure CalcTileRect(Pos: Integer; var TR: TRect;
-    ANumCols, ANumRows, ALeftOver: Integer; var AR: TRect);
+  procedure CalcTileRect(Pos: Integer; var TR: TRect);
   var
-    X, Y, Dv: Integer;
+    X, Y, D: Integer;
   begin
-    Dv := (ANumCols - ALeftOver) * ANumRows;
-    if Pos < Dv then begin
-      X := Pos div ANumRows;
-      Y := Pos mod ANumRows;
+    D := (NumCols - LeftOver) * NumRows;
+    if Pos < D then begin
+      X := Pos div NumRows;
+      Y := Pos mod NumRows;
     end else begin
-      X := (Pos - Dv) div (ANumRows + 1) + (ANumCols - ALeftOver);
-      Y := (Pos - Dv) mod (ANumRows + 1);
+      X := (Pos - D) div (NumRows + 1) + (NumCols - LeftOver);
+      Y := (Pos - D) mod (NumRows + 1);
     end;
-    TR.A.X := DividerLoc(AR.A.X, AR.B.X, ANumCols, X);
-    TR.B.X := DividerLoc(AR.A.X, AR.B.X, ANumCols, X + 1);
-    if Pos >= Dv then begin
-      TR.A.Y := DividerLoc(AR.A.Y, AR.B.Y, ANumRows + 1, Y);
-      TR.B.Y := DividerLoc(AR.A.Y, AR.B.Y, ANumRows + 1, Y + 1);
+    TR.A.X := DividerLoc(R.A.X, R.B.X, NumCols, X);
+    TR.B.X := DividerLoc(R.A.X, R.B.X, NumCols, X + 1);
+    if Pos >= D then begin
+      TR.A.Y := DividerLoc(R.A.Y, R.B.Y, NumRows + 1, Y);
+      TR.B.Y := DividerLoc(R.A.Y, R.B.Y, NumRows + 1, Y + 1);
     end else begin
-      TR.A.Y := DividerLoc(AR.A.Y, AR.B.Y, ANumRows, Y);
-      TR.B.Y := DividerLoc(AR.A.Y, AR.B.Y, ANumRows, Y + 1);
+      TR.A.Y := DividerLoc(R.A.Y, R.B.Y, NumRows, Y);
+      TR.B.Y := DividerLoc(R.A.Y, R.B.Y, NumRows, Y + 1);
     end;
   end;
 
@@ -291,19 +309,15 @@ begin
   until V = L0;
 
   if NumTileable > 0 then begin
-    D.X := R.B.X - R.A.X;
-    D.Y := R.B.Y - R.A.Y;
-    if (D.X < NumTileable) or (D.Y < NumTileable) then TileError
+    { Calculate most equal divisors for grid layout }
+    MostEqualDivisors(NumTileable, NumCols, NumRows, not TileColumnsFirst);
+
+    { Check if tiles would be zero-sized }
+    if ((R.B.X - R.A.X) div NumCols = 0) or
+       ((R.B.Y - R.A.Y) div NumRows = 0) then
+      TileError
     else begin
-      if not TileColumnsFirst then begin
-        NumCols := ISqrt(NumTileable);
-        NumRows := NumTileable div NumCols;
-        LeftOver := NumTileable mod NumCols;
-      end else begin
-        NumRows := ISqrt(NumTileable);
-        NumCols := NumTileable div NumRows;
-        LeftOver := NumTileable mod NumRows;
-      end;
+      LeftOver := NumTileable mod NumCols;
 
       { Tile the views }
       TileNum := NumTileable - 1;
@@ -311,11 +325,18 @@ begin
       repeat
         V := V^.Next;
         if Tileable(V) then begin
-          CalcTileRect(TileNum, NR, NumCols, NumRows, LeftOver, R);
+          CalcTileRect(TileNum, NR);
+          { Temporarily hide view to prevent flicker during relocation }
+          PState := V^.State;
+          V^.State := V^.State and not sfVisible;
           V^.Locate(NR);
+          V^.State := PState;
           Dec(TileNum);
         end;
       until V = L0;
+
+      { Redraw desktop after tiling }
+      DrawView;
     end;
   end;
 end;
