@@ -14,7 +14,7 @@ uses
   Winapi.Windows,
   {$ENDIF}
   System.SysUtils,
-  Objects, Video;
+  Objects, Video, fvconsts;
 
 {***************************************************************************}
 {                              PUBLIC CONSTANTS                             }
@@ -121,11 +121,10 @@ const
   smMono    = $0007;
   smFont8x8 = $0100;
 
-  { System commands }
+  { System commands - Note: cmResizeApp is defined in fvconsts.pas }
   cmReceivedFocus = 50;
   cmReleasedFocus = 51;
   cmQuitApp       = 52;
-  cmResizeApp     = 53;
 
 {***************************************************************************}
 {                          PUBLIC TYPE DEFINITIONS                          }
@@ -255,6 +254,7 @@ procedure NextQueuedEvent(var Event: TEvent);
 
 procedure HideMouseCursor;
 procedure ShowMouseCursor;
+
 
 const
   CheckSnow    : Boolean = False;
@@ -402,6 +402,9 @@ var
   KeyboardInitialized: Boolean;
   EventsInitialized: Boolean;
   StartupScreenMode: TDriversVideoMode;
+  { Resize detection }
+  LastScreenWidth: Word;
+  LastScreenHeight: Word;
 
 function GetDosTicks: LongInt;
 begin
@@ -806,9 +809,30 @@ begin
 end;
 
 procedure GetSystemEvent(var Event: TEvent);
+var
+  Info: TConsoleScreenBufferInfo;
+  NewWidth, NewHeight: Word;
 begin
   Event.What := evNothing;
-  { TODO: Handle window resize events }
+
+  { Poll for console window resize }
+  if GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), Info) then begin
+    NewWidth := Info.srWindow.Right - Info.srWindow.Left + 1;
+    NewHeight := Info.srWindow.Bottom - Info.srWindow.Top + 1;
+    if NewWidth > MaxViewWidth then NewWidth := MaxViewWidth;
+
+    { Check if size changed }
+    if (NewWidth <> LastScreenWidth) or (NewHeight <> LastScreenHeight) then begin
+      { Generate resize event }
+      Event.What := evCommand;
+      Event.Command := cmResizeApp;
+      Event.InfoWord := (NewHeight shl 8) or NewWidth; { Pack new dimensions }
+
+      { Update tracking }
+      LastScreenWidth := NewWidth;
+      LastScreenHeight := NewHeight;
+    end;
+  end;
 end;
 
 procedure InitEvents;
@@ -898,6 +922,10 @@ begin
   StartupScreenMode.Row := DriversScreenHeight;
   StartupScreenMode.Color := True;
   DriversScreenMode := StartupScreenMode;
+
+  { Update resize tracking to match actual screen size }
+  LastScreenWidth := DriversScreenWidth;
+  LastScreenHeight := DriversScreenHeight;
 
   VideoInitialized := True;
   Result := True;
@@ -1112,6 +1140,11 @@ initialization
   KeyboardInitialized := False;
   EventsInitialized := False;
   SysErrorFunc := SystemError;
+  LastScreenWidth := 0;
+  LastScreenHeight := 0;
   DetectVideo;
+  { Initialize resize tracking to current screen size }
+  LastScreenWidth := DriversScreenWidth;
+  LastScreenHeight := DriversScreenHeight;
 
 end.

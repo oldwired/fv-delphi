@@ -660,6 +660,8 @@ end;
 procedure TProgram.HandleEvent(var Event: TEvent);
 var
   Handled: Boolean;
+  R: TRect;
+  NewWidth, NewHeight: Word;
 begin
   Handled := False;
   if Event.What = evKeyDown then begin
@@ -679,6 +681,35 @@ begin
       ClearEvent(Event);
     end;
   end;
+
+  { Handle cmResizeApp BEFORE passing to subviews - this is a system event }
+  if (Event.What = evCommand) and (Event.Command = cmResizeApp) then begin
+    { Extract new dimensions from InfoWord (height in high byte, width in low byte) }
+    NewWidth := Event.InfoWord and $FF;
+    NewHeight := Event.InfoWord shr 8;
+
+    { Resize the video buffer }
+    Video.ResizeVideo(NewWidth, NewHeight);
+
+    { Update driver screen dimensions }
+    DriversScreenWidth := Video.ScreenWidth;
+    DriversScreenHeight := Video.ScreenHeight;
+
+    { Update our Buffer pointer }
+    Buffer := PWordArray(Video.VideoBuf);
+
+    { Resize the program bounds and all subviews }
+    R.Assign(0, 0, DriversScreenWidth, DriversScreenHeight);
+    ChangeBounds(R);
+
+    { Force full redraw }
+    Draw;
+    Video.UpdateScreen(True);
+
+    ClearEvent(Event);
+    Exit;
+  end;
+
   { Always call inherited to let subviews process the event }
   inherited HandleEvent(Event);
   if Event.What = evCommand then begin

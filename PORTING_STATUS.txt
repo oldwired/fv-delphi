@@ -286,9 +286,7 @@ Phase 3 Unit Tests:
 KNOWN ISSUES
 ==============================================================================
 
-1. Console window resize not handled (visual artifacts if console resized)
-
-2. Editor uses ANSI encoding - Umlauts and special characters don't display
+1. Editor uses ANSI encoding - Umlauts and special characters don't display
    correctly when files are saved/loaded with UTF-8 encoding (modern Notepad
    default). Workaround: Use ANSI encoding in external editors.
 

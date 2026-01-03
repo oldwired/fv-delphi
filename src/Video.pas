@@ -48,6 +48,7 @@ procedure HideCursor;
 procedure SetVideoMode(const Mode: TVideoMode);
 procedure GetVideoMode(var Mode: TVideoMode);
 function GetCapabilities: Word;
+procedure ResizeVideo(NewWidth, NewHeight: Word);
 
 implementation
 
@@ -202,6 +203,27 @@ end;
 function GetCapabilities: Word;
 begin
   Result := 0;
+end;
+
+procedure ResizeVideo(NewWidth, NewHeight: Word);
+begin
+  if not VideoInitialized then Exit;
+
+  { Clamp to maximum size supported by internal buffer }
+  if NewWidth > 255 then NewWidth := 255;
+  if NewHeight > 255 then NewHeight := 255;
+
+  { Update dimensions }
+  ScreenWidth := NewWidth;
+  ScreenHeight := NewHeight;
+  VideoBufSize := ScreenWidth * ScreenHeight * SizeOf(TVideoCell);
+
+  { Clear both buffers to force full redraw }
+  FillChar(InternalBuf, SizeOf(InternalBuf), 0);
+  FillChar(InternalOldBuf, SizeOf(InternalOldBuf), 0);
+
+  { Fill with default blank character (space with normal attribute) }
+  ClearScreen;
 end;
 
 end.
