@@ -121,11 +121,6 @@ const
   smMono    = $0007;
   smFont8x8 = $0100;
 
-  { System commands - Note: cmResizeApp is defined in fvconsts.pas }
-  cmReceivedFocus = 50;
-  cmReleasedFocus = 51;
-  cmQuitApp       = 52;
-
 {***************************************************************************}
 {                          PUBLIC TYPE DEFINITIONS                          }
 {***************************************************************************}

@@ -169,16 +169,8 @@ function WindowColorItems(Palette: Word; Next: PColorItem): PColorItem;
 { Registration }
 procedure RegisterColorSel;
 
-{ Broadcast commands for color selection }
+{ Selector types }
 const
-  cmColorForegroundChanged = 71;
-  cmColorBackgroundChanged = 72;
-  cmColorSet = 73;
-  cmNewColorItem = 74;
-  cmNewColorIndex = 75;
-  cmSaveColorIndex = 76;
-
-  { Selector types }
   csForeground = 0;
   csBackground = 1;
 
