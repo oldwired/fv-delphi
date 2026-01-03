@@ -357,6 +357,7 @@ const
 
   { Windows console constants not always defined in Delphi }
   MOUSE_WHEELED = $0004;
+  DOUBLE_CLICK = $0002;
 
   AltCodes: array[0..127] of Byte = (
     $00, $00, $00, $00, $00, $00, $00, $00,
@@ -742,14 +743,18 @@ begin
 
     Event.Double := False;
 
-    if InputRec.Event.MouseEvent.dwEventFlags = 0 then begin
+    { Handle button press/release - includes DOUBLE_CLICK events }
+    if (InputRec.Event.MouseEvent.dwEventFlags = 0) or
+       (InputRec.Event.MouseEvent.dwEventFlags = DOUBLE_CLICK) then begin
       { Button state change }
       if NewButtons > LastButtons then begin
         MouseWhere.X := InputRec.Event.MouseEvent.dwMousePosition.X;
         MouseWhere.Y := InputRec.Event.MouseEvent.dwMousePosition.Y;
         Event.What := evMouseDown;
-        if (DownButtons = NewButtons) and (LastWhere.X = MouseWhere.X) and
-           (LastWhere.Y = MouseWhere.Y) and (GetDosTicks - DownTicks <= DoubleDelay) then
+        { Double-click: either Windows detected it OR timing-based detection }
+        if (InputRec.Event.MouseEvent.dwEventFlags = DOUBLE_CLICK) or
+           ((DownButtons = NewButtons) and (LastWhere.X = MouseWhere.X) and
+            (LastWhere.Y = MouseWhere.Y) and (GetDosTicks - DownTicks <= DoubleDelay)) then
           Event.Double := True;
         DownButtons := NewButtons;
         DownWhere := MouseWhere;
