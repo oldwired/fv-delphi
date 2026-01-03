@@ -14,9 +14,11 @@ The original sourcecode for free vision is in C:\temp\fpc\fpc\packages\fv refere
 
 ## Build Commands
 
-Use the MCP build tool:
+Use the MCP build tool with **Win32** platform and **Debug** configuration:
 
-`mcp__dbuildmcp__msbuild with projectfile="C:/projects/fv-delphi/FVTest.dproj"`
+`mcp__dbuildmcp__msbuild with projectfile="C:/projects/fv-delphi/FVTest.dproj", platform="Win32", config="Debug"`
+
+**Important**: Always use Win32/Debug during development. The project targets 32-bit Windows.
 
 ## Testing
 
@@ -75,11 +77,10 @@ The test app exercises all ported widgets through menu options (Test menu). Debu
 
 ## Porting Status
 
-See `PORTING_STATUS.txt` for detailed status. Core functionality is complete. Not yet ported:
-- **Editors.pas** - Text editor (complex, 1400+ lines)
+See `PORTING_STATUS.txt` for detailed status. Core functionality is complete. Recently ported:
+- **Editors.pas** - Text editor (compiles, needs testing)
 - **ColorSel.pas** - Color selection dialogs
-- **Statuses.pas** - Progress gauges
-- **Outline.pas** - Tree view
+- **Outline.pas** - Tree view (with mousewheel support)
 
 ## Known Issues
 

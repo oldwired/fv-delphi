@@ -1505,7 +1505,7 @@ end;
 { TDirListBox }
 
 var
-  DrivesS: String = '';
+  DrivesS: ShortString = '';
   Drives: PString = @DrivesS;
 
 constructor TDirListBox.Init(var Bounds: TRect; AScrollBar: PScrollBar);
@@ -1608,7 +1608,7 @@ begin
     OldC := ' ';
     for C := 'A' to 'Z' do
     begin
-      if (C < 'C') or DriveValid(C) then
+      if DriveValid(C) then
       begin
         if OldC <> ' ' then
         begin
