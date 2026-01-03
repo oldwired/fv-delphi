@@ -242,6 +242,9 @@ const
   cmTile    = 25;
   cmCascade = 26;
   cmHide    = 27;
+  cmTileHorizontal = 28;
+  cmTileVertical   = 29;
+  cmCascadeNoResize = 30;
   cmReceivedFocus     = 50;
   cmReleasedFocus     = 51;
   cmCommandSetChanged = 52;

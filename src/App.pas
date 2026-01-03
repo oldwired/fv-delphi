@@ -78,7 +78,11 @@ type
     procedure Store(var S: TStream);
     procedure TileError; virtual;
     procedure Tile(var R: TRect); virtual;
+    procedure TileHorizontal(var R: TRect); virtual;
+    procedure TileVertical(var R: TRect); virtual;
     procedure Cascade(var R: TRect); virtual;
+    procedure CascadeNoResize(var R: TRect); virtual;
+    procedure CloseAll; virtual;
   end;
 
   PProgram = ^TProgram;
@@ -109,6 +113,10 @@ type
     procedure GetTileRect(var R: TRect); virtual;
     procedure HandleEvent(var Event: TEvent); virtual;
     procedure Tile;
+    procedure TileHorizontal;
+    procedure TileVertical;
+    procedure CascadeNoResize;
+    procedure CloseAll;
   end;
 
 const
@@ -390,6 +398,197 @@ begin
   end;
 end;
 
+procedure TDesktop.CascadeNoResize(var R: TRect);
+var
+  CascadeNum, Cnt: Integer;
+  V, L0: PView;
+  DX, DY: Integer;
+  PState: Word;
+
+  function Cascadeable(P: PView): Boolean;
+  begin
+    Result := (P^.Options and ofTileable <> 0) and (P^.State and sfVisible <> 0);
+  end;
+
+begin
+  if Last = nil then Exit;
+
+  { Count cascadeable views }
+  CascadeNum := 0;
+  V := Last;
+  L0 := Last;
+  repeat
+    V := V^.Next;
+    if Cascadeable(V) then Inc(CascadeNum);
+  until V = L0;
+
+  if CascadeNum > 0 then begin
+    { Cascade all cascadeable views - just move, don't resize }
+    Cnt := 0;
+    V := Last;
+    repeat
+      V := V^.Next;
+      if Cascadeable(V) then begin
+        { Calculate new position offset from top-left of desktop }
+        DX := R.A.X + Cnt - V^.Origin.X;
+        DY := R.A.Y + Cnt - V^.Origin.Y;
+        { Temporarily hide view to prevent flicker }
+        PState := V^.State;
+        V^.State := V^.State and not sfVisible;
+        V^.MoveTo(V^.Origin.X + DX, V^.Origin.Y + DY);
+        V^.State := PState;
+        Inc(Cnt);
+      end;
+    until V = L0;
+
+    DrawView;
+  end;
+end;
+
+procedure TDesktop.TileHorizontal(var R: TRect);
+var
+  NumTileable, TileNum: Integer;
+  V, L0: PView;
+  NR: TRect;
+  PState: Word;
+
+  function Tileable(P: PView): Boolean;
+  begin
+    Result := (P^.Options and ofTileable <> 0) and (P^.State and sfVisible <> 0);
+  end;
+
+  function DividerLoc(Lo, Hi, Num, Pos: Integer): Integer;
+  begin
+    Result := LongInt(LongInt(Hi - Lo) * Pos) div Num + Lo;
+  end;
+
+begin
+  if Last = nil then Exit;
+
+  { Count tileable views }
+  NumTileable := 0;
+  V := Last;
+  L0 := Last;
+  repeat
+    V := V^.Next;
+    if Tileable(V) then Inc(NumTileable);
+  until V = L0;
+
+  if NumTileable > 0 then begin
+    { Check if tiles would be zero-sized }
+    if (R.B.X - R.A.X) div NumTileable = 0 then
+      TileError
+    else begin
+      { Tile horizontally: single row, N columns }
+      TileNum := NumTileable - 1;
+      V := Last;
+      repeat
+        V := V^.Next;
+        if Tileable(V) then begin
+          NR.A.X := DividerLoc(R.A.X, R.B.X, NumTileable, TileNum);
+          NR.B.X := DividerLoc(R.A.X, R.B.X, NumTileable, TileNum + 1);
+          NR.A.Y := R.A.Y;
+          NR.B.Y := R.B.Y;
+          { Temporarily hide view to prevent flicker }
+          PState := V^.State;
+          V^.State := V^.State and not sfVisible;
+          V^.Locate(NR);
+          V^.State := PState;
+          Dec(TileNum);
+        end;
+      until V = L0;
+
+      DrawView;
+    end;
+  end;
+end;
+
+procedure TDesktop.TileVertical(var R: TRect);
+var
+  NumTileable, TileNum: Integer;
+  V, L0: PView;
+  NR: TRect;
+  PState: Word;
+
+  function Tileable(P: PView): Boolean;
+  begin
+    Result := (P^.Options and ofTileable <> 0) and (P^.State and sfVisible <> 0);
+  end;
+
+  function DividerLoc(Lo, Hi, Num, Pos: Integer): Integer;
+  begin
+    Result := LongInt(LongInt(Hi - Lo) * Pos) div Num + Lo;
+  end;
+
+begin
+  if Last = nil then Exit;
+
+  { Count tileable views }
+  NumTileable := 0;
+  V := Last;
+  L0 := Last;
+  repeat
+    V := V^.Next;
+    if Tileable(V) then Inc(NumTileable);
+  until V = L0;
+
+  if NumTileable > 0 then begin
+    { Check if tiles would be zero-sized }
+    if (R.B.Y - R.A.Y) div NumTileable = 0 then
+      TileError
+    else begin
+      { Tile vertically: single column, N rows }
+      TileNum := NumTileable - 1;
+      V := Last;
+      repeat
+        V := V^.Next;
+        if Tileable(V) then begin
+          NR.A.X := R.A.X;
+          NR.B.X := R.B.X;
+          NR.A.Y := DividerLoc(R.A.Y, R.B.Y, NumTileable, TileNum);
+          NR.B.Y := DividerLoc(R.A.Y, R.B.Y, NumTileable, TileNum + 1);
+          { Temporarily hide view to prevent flicker }
+          PState := V^.State;
+          V^.State := V^.State and not sfVisible;
+          V^.Locate(NR);
+          V^.State := PState;
+          Dec(TileNum);
+        end;
+      until V = L0;
+
+      DrawView;
+    end;
+  end;
+end;
+
+procedure TDesktop.CloseAll;
+var
+  V, NextV, L0: PView;
+
+  function Closeable(P: PView): Boolean;
+  begin
+    Result := (P^.Options and ofTileable <> 0) and (P^.State and sfVisible <> 0);
+  end;
+
+begin
+  if Last = nil then Exit;
+
+  { Close all tileable views - iterate carefully since closing modifies the list }
+  L0 := Last;
+  V := Last^.Next;
+  while V <> L0 do begin
+    NextV := V^.Next;
+    if Closeable(V) then begin
+      { Send close message to the view }
+      Message(V, evCommand, cmClose, nil);
+    end;
+    V := NextV;
+  end;
+  { Check the last one too }
+  if Closeable(L0) then
+    Message(L0, evCommand, cmClose, nil);
+end;
+
 { TProgram }
 
 constructor TProgram.Init;
@@ -595,7 +794,11 @@ begin
   if Event.What = evCommand then begin
     case Event.Command of
       cmTile: Tile;
+      cmTileHorizontal: TileHorizontal;
+      cmTileVertical: TileVertical;
       cmCascade: Cascade;
+      cmCascadeNoResize: CascadeNoResize;
+      cmCloseAll: CloseAll;
       cmDosShell: DosShell;
     else
       Exit;
@@ -610,6 +813,35 @@ var
 begin
   GetTileRect(R);
   if Desktop <> nil then Desktop^.Tile(R);
+end;
+
+procedure TApplication.TileHorizontal;
+var
+  R: TRect;
+begin
+  GetTileRect(R);
+  if Desktop <> nil then Desktop^.TileHorizontal(R);
+end;
+
+procedure TApplication.TileVertical;
+var
+  R: TRect;
+begin
+  GetTileRect(R);
+  if Desktop <> nil then Desktop^.TileVertical(R);
+end;
+
+procedure TApplication.CascadeNoResize;
+var
+  R: TRect;
+begin
+  GetTileRect(R);
+  if Desktop <> nil then Desktop^.CascadeNoResize(R);
+end;
+
+procedure TApplication.CloseAll;
+begin
+  if Desktop <> nil then Desktop^.CloseAll;
 end;
 
 procedure RegisterApp;

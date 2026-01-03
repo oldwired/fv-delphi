@@ -302,10 +302,16 @@ begin
       nil)))))))))))))))))),
     NewSubMenu('~W~indow', hcNoContext, NewMenu(
       NewItem('~T~ile', '', kbNoKey, cmTile, hcNoContext,
-      NewItem('~C~ascade', '', kbNoKey, cmCascade, hcNoContext,
+      NewItem('Tile ~H~orizontal', '', kbNoKey, cmTileHorizontal, hcNoContext,
+      NewItem('Tile ~V~ertical', '', kbNoKey, cmTileVertical, hcNoContext,
+      NewItem('C~a~scade', '', kbNoKey, cmCascade, hcNoContext,
+      NewItem('Cascade (~K~eep Size)', '', kbNoKey, cmCascadeNoResize, hcNoContext,
+      NewLine(
       NewItem('~N~ext', 'F6', kbF6, cmNext, hcNoContext,
       NewItem('~P~revious', 'Shift-F6', kbShiftF6, cmPrev, hcNoContext,
-      NewItem('~C~lose', 'Alt-F3', kbAltF3, cmClose, hcNoContext, nil)))))),
+      NewLine(
+      NewItem('~C~lose', 'Alt-F3', kbAltF3, cmClose, hcNoContext,
+      NewItem('Close ~A~ll', '', kbNoKey, cmCloseAll, hcNoContext, nil)))))))))))),
     nil))))));
 end;
 
