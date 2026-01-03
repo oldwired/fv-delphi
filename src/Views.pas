@@ -163,6 +163,7 @@ type
     procedure Show;
     procedure Draw; virtual;
     procedure DrawView;
+    procedure DrawShadow;
     procedure DrawCursor; virtual;
     procedure Select;
     procedure Awaken; virtual;
@@ -636,7 +637,51 @@ procedure TView.DrawView;
 begin
   if (State and sfExposed) <> 0 then begin
     Draw;
+    if (State and sfShadow) <> 0 then
+      DrawShadow;
     DrawCursor;
+  end;
+end;
+
+procedure TView.DrawShadow;
+var
+  GX, GY: Integer;
+  V: PView;
+  I, J: Integer;
+  Target: PWord;
+begin
+  { Calculate global position }
+  GX := Origin.X;
+  GY := Origin.Y;
+  V := Owner;
+  while V <> nil do begin
+    Inc(GX, V^.Origin.X);
+    Inc(GY, V^.Origin.Y);
+    V := V^.Owner;
+  end;
+
+  { Draw right shadow (width = ShadowSize.X, height = Size.Y) }
+  for I := ShadowSize.Y to Size.Y - 1 do begin
+    for J := 0 to ShadowSize.X - 1 do begin
+      if (GY + I >= 0) and (GY + I < Video.ScreenHeight) and
+         (GX + Size.X + J >= 0) and (GX + Size.X + J < Video.ScreenWidth) then begin
+        Target := @VideoBuf^[(GY + I) * Video.ScreenWidth + GX + Size.X + J];
+        { Keep the character, change attribute to shadow }
+        Target^ := (Target^ and $00FF) or (Word(ShadowAttr) shl 8);
+      end;
+    end;
+  end;
+
+  { Draw bottom shadow (width = Size.X, height = ShadowSize.Y) }
+  for I := 0 to ShadowSize.Y - 1 do begin
+    for J := ShadowSize.X to Size.X + ShadowSize.X - 1 do begin
+      if (GY + Size.Y + I >= 0) and (GY + Size.Y + I < Video.ScreenHeight) and
+         (GX + J >= 0) and (GX + J < Video.ScreenWidth) then begin
+        Target := @VideoBuf^[(GY + Size.Y + I) * Video.ScreenWidth + GX + J];
+        { Keep the character, change attribute to shadow }
+        Target^ := (Target^ and $00FF) or (Word(ShadowAttr) shl 8);
+      end;
+    end;
   end;
 end;
 
