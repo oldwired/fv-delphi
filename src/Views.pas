@@ -2132,6 +2132,17 @@ var
 begin
   inherited HandleEvent(Event);
   if Event.What = evMouseDown then begin
+    { Handle mouse wheel scrolling }
+    if Event.Buttons and mbScrollWheelUp <> 0 then begin
+      SetValue(Value - PgStep);
+      ClearEvent(Event);
+      Exit;
+    end;
+    if Event.Buttons and mbScrollWheelDown <> 0 then begin
+      SetValue(Value + PgStep);
+      ClearEvent(Event);
+      Exit;
+    end;
     OldValue := Value;
     MakeLocal(Event.Where, Mouse);
     if Size.X = 1 then begin
@@ -2281,7 +2292,17 @@ end;
 procedure TScroller.HandleEvent(var Event: TEvent);
 begin
   inherited HandleEvent(Event);
-  if Event.What = evBroadcast then begin
+  if Event.What = evMouseDown then begin
+    { Handle mouse wheel scrolling }
+    if (VScrollBar <> nil) and (Event.Buttons and (mbScrollWheelUp or mbScrollWheelDown) <> 0) then begin
+      if Event.Buttons and mbScrollWheelUp <> 0 then
+        VScrollBar^.SetValue(VScrollBar^.Value - VScrollBar^.PgStep)
+      else
+        VScrollBar^.SetValue(VScrollBar^.Value + VScrollBar^.PgStep);
+      ClearEvent(Event);
+    end;
+  end
+  else if Event.What = evBroadcast then begin
     if (Event.Command = cmScrollBarChanged) and
        ((Event.InfoPtr = HScrollBar) or (Event.InfoPtr = VScrollBar)) then begin
       if HScrollBar <> nil then Delta.X := HScrollBar^.Value;
@@ -2504,6 +2525,17 @@ begin
       end;
     end;
     evMouseDown: begin
+      { Handle mouse wheel scrolling }
+      if Event.Buttons and mbScrollWheelUp <> 0 then begin
+        MoveFocus(Focused - 3);
+        ClearEvent(Event);
+        Exit;
+      end;
+      if Event.Buttons and mbScrollWheelDown <> 0 then begin
+        MoveFocus(Focused + 3);
+        ClearEvent(Event);
+        Exit;
+      end;
       Cw := Size.X div NumCols + 1;
       Oi := Focused;
       MakeLocal(Event.Where, Mouse);
