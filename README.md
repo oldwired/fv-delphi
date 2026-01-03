@@ -109,7 +109,7 @@ See `PORTING_STATUS.txt` for detailed porting status and known issues.
 
 1. **Console Resize**: Window resize events are not handled (may cause visual artifacts)
 2. **ANSI Encoding**: Editor uses ANSI encoding; UTF-8 files may not display correctly
-3. New edge-cases, oversights or error may be introduced in this project
+3. New **edge-cases**, **oversights** or **errors** may be introduced in this project
 
 ## License
 

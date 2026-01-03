@@ -351,6 +351,75 @@ RECENT FIXES (January 2026)
    - Error dialogs now show correct filename instead of gibberish
 
 ==============================================================================
+NEW FEATURES (January 2026)
+==============================================================================
+
+1. Mousewheel Scrolling (Views.pas)
+   - TScroller now responds to mouse wheel events
+   - Scrolls content vertically when wheel is used
+
+2. Additional Window Arrangement Modes (App.pas, fvconsts.pas)
+   - cmTileHorizontal (28) - Tile windows in a single row
+   - cmTileVertical (29) - Tile windows in a single column
+   - cmCascadeNoResize (30) - Cascade windows without changing their size
+   - cmCloseAll (37) - Close all tileable windows
+   - TDesktop methods: TileHorizontal, TileVertical, CascadeNoResize, CloseAll
+   - TApplication wrapper methods for easy access
+
+3. Calendar Control (Calendar.pas) - NEW UNIT
+   [X] TCalendarView - Text-mode calendar control
+       - Month/year display with day grid
+       - Keyboard navigation:
+         * Arrow keys: day-by-day movement
+         * PgUp/PgDn: previous/next month
+         * Ctrl+PgUp/PgDn: previous/next year
+         * Enter: confirm selection
+       - Mouse navigation:
+         * Click on day to select
+         * Click < > arrows to change month
+         * Click month name for month selection popup
+         * Click year for year selection popup
+       - Configurable first day of week (FirstDayOfWeek property)
+         * 0 = Sunday (default), 1 = Monday, etc.
+         * SetFirstDayOfWeek(AFirstDay) method
+       - Configurable day colors (DayColors array)
+         * SetDayColor(ADayOfWeek, AColorIndex) method
+         * Allows different colors for weekends, etc.
+       - Day preservation when changing month/year
+         * ClampDay ensures valid day (handles 29/30/31)
+       - Event notification:
+         * OnDateSelect callback (TCalendarDateEvent)
+         * cmCalendarDateSelected broadcast message
+       - TCalendarMenu - Internal popup menu for month/year selection
+         * Uses standard menu palette colors
+         * Keyboard and mouse navigation
+
+   Calendar Palette (CCalendarView):
+   - Index 1: Normal day color
+   - Index 2: Selected day color
+   - Index 3: Title color
+   - Index 4: Arrow color
+   - Index 5: Weekend/custom day color
+
+   Usage Example (Callback approach):
+     CalView := New(PCalendarView, Init(R));
+     CalView^.SetFirstDayOfWeek(1);  { Monday first }
+     CalView^.SetDayColor(0, 5);     { Sunday in color 5 }
+     CalView^.OnDateSelect := MyDateHandler;
+
+   Usage Example (Broadcast approach):
+     procedure TMyWindow.HandleEvent(var Event: TEvent);
+     begin
+       inherited HandleEvent(Event);
+       if (Event.What = evBroadcast) and
+          (Event.Command = cmCalendarDateSelected) then begin
+         Cal := PCalendarView(Event.InfoPtr);
+         { Handle date change }
+         ClearEvent(Event);
+       end;
+     end;
+
+==============================================================================
 NOTES
 ==============================================================================
 

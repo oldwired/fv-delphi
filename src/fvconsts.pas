@@ -252,6 +252,7 @@ const
   cmScrollBarClicked  = 54;
   cmSelectWindowNum   = 55;
   cmListItemSelected  = 56;
+  cmCalendarDateSelected = 57;
 
   { ColorSel Unit }
   cmColorForegroundChanged = 71;

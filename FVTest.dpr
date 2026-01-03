@@ -27,7 +27,8 @@ uses
   Statuses in 'src\Statuses.pas',
   ColorSel in 'src\ColorSel.pas',
   Outline in 'src\Outline.pas',
-  Editors in 'src\Editors.pas';
+  Editors in 'src\Editors.pas',
+  Calendar in 'src\Calendar.pas';
 
 const
   cmNewWindow = 100;
@@ -54,6 +55,8 @@ const
   cmTestEditorFind = 1021;
   cmTestEditorFile = 1022;
   cmTestEditorClipboard = 1023;
+  cmTestCalendar = 1024;
+  cmTestCalendarBroadcast = 1025;
 
 var
   ExceptionLog: TextFile;
@@ -83,6 +86,7 @@ type
 
   PMyApp = ^TMyApp;
   TMyApp = object(TApplication)
+    CalendarDateLabel: PStaticText;  { Reference for calendar demo }
     constructor Init;
     procedure InitMenuBar; virtual;
     procedure InitStatusLine; virtual;
@@ -109,6 +113,17 @@ type
     procedure TestEditorFind;
     procedure TestEditorFile;
     procedure TestEditorClipboard;
+    procedure TestCalendar;
+    procedure TestCalendarBroadcast;
+    procedure OnCalendarDateSelect(Calendar: PCalendarView);
+  end;
+
+  { Custom window for calendar that handles broadcast }
+  PCalendarWindow = ^TCalendarWindow;
+  TCalendarWindow = object(TWindow)
+    DateLabel: PStaticText;
+    constructor Init(var Bounds: TRect);
+    procedure HandleEvent(var Event: TEvent); virtual;
   end;
 
   { Custom scroller that displays numbered lines }
@@ -147,6 +162,63 @@ constructor TMyWindow.Init(var Bounds: TRect; ATitle: ShortString; ANumber: Inte
 begin
   inherited Init(Bounds, ATitle, ANumber);
   Options := Options or ofTileable;
+end;
+
+{ TCalendarWindow - demonstrates broadcast handling }
+constructor TCalendarWindow.Init(var Bounds: TRect);
+var
+  R: TRect;
+  CalView: PCalendarView;
+  Y, M, D: Word;
+  S: ShortString;
+begin
+  inherited Init(Bounds, 'Calendar (Broadcast)', wnNoNumber);
+  Options := Options or ofTileable;
+  Flags := Flags and not (wfGrow or wfZoom);
+
+  { Add the calendar view }
+  R.Assign(2, 1, 24, 9);
+  CalView := New(PCalendarView, Init(R));
+  CalView^.SetFirstDayOfWeek(1);
+  CalView^.SetDayColor(0, 5);
+  CalView^.SetDayColor(6, 5);
+  Insert(CalView);
+
+  { Add label to show selected date }
+  CalView^.GetDate(Y, M, D);
+  S := ShortString(Format('Selected: %d/%d/%d', [M, D, Y]));
+  R.Assign(2, 10, 26, 11);
+  DateLabel := New(PStaticText, Init(R, S));
+  Insert(DateLabel);
+
+  { Instructions }
+  R.Assign(2, 9, 26, 10);
+  Insert(New(PStaticText, Init(R, 'Using broadcast message')));
+
+  CalView^.Select;
+end;
+
+procedure TCalendarWindow.HandleEvent(var Event: TEvent);
+var
+  Cal: PCalendarView;
+  Y, M, D: Word;
+  S: ShortString;
+begin
+  inherited HandleEvent(Event);
+
+  { Handle calendar date selection broadcast }
+  if (Event.What = evBroadcast) and (Event.Command = cmCalendarDateSelected) then begin
+    Cal := PCalendarView(Event.InfoPtr);
+    if (Cal <> nil) and (DateLabel <> nil) then begin
+      Cal^.GetDate(Y, M, D);
+      S := ShortString(Format('Selected: %d/%d/%d', [M, D, Y]));
+      if DateLabel^.Text <> nil then
+        DisposeStr(DateLabel^.Text);
+      DateLabel^.Text := NewStr(S);
+      DateLabel^.DrawView;
+    end;
+    ClearEvent(Event);
+  end;
 end;
 
 { TTabTestDialog }
@@ -242,6 +314,7 @@ var
   R: TRect;
 begin
   inherited Init;
+  CalendarDateLabel := nil;
 
   { Add Clock view at top right of desktop }
   if Desktop <> nil then begin
@@ -293,13 +366,17 @@ begin
       NewItem('~S~tatuses', '', kbNoKey, cmTestStatuses, hcNoContext,
       NewItem('~C~olors', '', kbNoKey, cmTestColors, hcNoContext,
       NewItem('~O~utline', '', kbNoKey, cmTestOutline, hcNoContext,
+      NewSubMenu('Ca~l~endar', hcNoContext, NewMenu(
+        NewItem('~C~allback', '', kbNoKey, cmTestCalendar, hcNoContext,
+        NewItem('~B~roadcast', '', kbNoKey, cmTestCalendarBroadcast, hcNoContext,
+        nil))),
       NewSubMenu('~E~ditor', hcNoContext, NewMenu(
         NewItem('~N~ew Editor', '', kbNoKey, cmTestEditor, hcNoContext,
         NewItem('~F~ind/Replace', '', kbNoKey, cmTestEditorFind, hcNoContext,
         NewItem('File ~L~oad/Save', '', kbNoKey, cmTestEditorFile, hcNoContext,
         NewItem('~C~lipboard', '', kbNoKey, cmTestEditorClipboard, hcNoContext,
         nil))))),
-      nil)))))))))))))))))),
+      nil))))))))))))))))))),
     NewSubMenu('~W~indow', hcNoContext, NewMenu(
       NewItem('~T~ile', '', kbNoKey, cmTile, hcNoContext,
       NewItem('Tile ~H~orizontal', '', kbNoKey, cmTileHorizontal, hcNoContext,
@@ -357,6 +434,8 @@ begin
         cmTestEditorFind: TestEditorFind;
         cmTestEditorFile: TestEditorFile;
         cmTestEditorClipboard: TestEditorClipboard;
+        cmTestCalendar: TestCalendar;
+        cmTestCalendarBroadcast: TestCalendarBroadcast;
       else
         Exit;
       end;
@@ -1183,6 +1262,84 @@ begin
     { Clean up if window creation failed }
     DisposeNode(Root);
   end;
+end;
+
+procedure TMyApp.TestCalendar;
+{ Test calendar view - opens in a window so events can be handled }
+var
+  R: TRect;
+  Win: PWindow;
+  CalView: PCalendarView;
+  Y, M, D: Word;
+  S: string;
+begin
+  R.Assign(0, 0, 28, 14);
+  R.Move((Desktop^.Size.X - R.B.X) div 2, (Desktop^.Size.Y - R.B.Y) div 2);
+  Win := New(PWindow, Init(R, 'Calendar', wnNoNumber));
+  if Win <> nil then begin
+    Win^.Options := Win^.Options or ofTileable;
+    Win^.Flags := Win^.Flags and not (wfGrow or wfZoom);
+
+    { Add the calendar view }
+    R.Assign(2, 1, 24, 9);
+    CalView := New(PCalendarView, Init(R));
+
+    { Configure calendar: Monday as first day }
+    CalView^.SetFirstDayOfWeek(1);  { 0=Sunday, 1=Monday }
+
+    { Make Sunday (0) use color 5 (typically highlight) }
+    CalView^.SetDayColor(0, 5);  { Sunday }
+    { Saturday can also be colored }
+    CalView^.SetDayColor(6, 5);  { Saturday }
+
+    { Set up callback for date changes }
+    CalView^.OnDateSelect := OnCalendarDateSelect;
+
+    Win^.Insert(CalView);
+
+    { Add label to show selected date }
+    CalView^.GetDate(Y, M, D);
+    S := Format('Selected: %d/%d/%d', [M, D, Y]);
+    R.Assign(2, 10, 26, 11);
+    CalendarDateLabel := New(PStaticText, Init(R, ShortString(S)));
+    Win^.Insert(CalendarDateLabel);
+
+    { Instructions }
+    R.Assign(2, 9, 26, 10);
+    Win^.Insert(New(PStaticText, Init(R, 'Click < > month year')));
+
+    Desktop^.Insert(Win);
+    CalView^.Select;
+  end;
+end;
+
+procedure TMyApp.OnCalendarDateSelect(Calendar: PCalendarView);
+var
+  Y, M, D: Word;
+  S: ShortString;
+begin
+  if (Calendar <> nil) and (CalendarDateLabel <> nil) then begin
+    Calendar^.GetDate(Y, M, D);
+    S := ShortString(Format('Selected: %d/%d/%d', [M, D, Y]));
+    { Update the label text }
+    if CalendarDateLabel^.Text <> nil then
+      DisposeStr(CalendarDateLabel^.Text);
+    CalendarDateLabel^.Text := NewStr(S);
+    CalendarDateLabel^.DrawView;
+  end;
+end;
+
+procedure TMyApp.TestCalendarBroadcast;
+{ Test calendar using broadcast message approach }
+var
+  R: TRect;
+  Win: PCalendarWindow;
+begin
+  R.Assign(0, 0, 28, 14);
+  R.Move((Desktop^.Size.X - R.B.X) div 2 + 5, (Desktop^.Size.Y - R.B.Y) div 2 + 2);
+  Win := New(PCalendarWindow, Init(R));
+  if Win <> nil then
+    Desktop^.Insert(Win);
 end;
 
 procedure TMyApp.TestEditor;
