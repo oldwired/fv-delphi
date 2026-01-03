@@ -646,53 +646,87 @@ end;
 
 procedure TButton.DrawState(Down: Boolean);
 var
-  CButton, CShadow, CText: Word;
-  Ch: AnsiChar;
-  I, S, T, Y: Integer;
-  B: TDrawBuffer;
-  TitleStr: ShortString;
+  Bc, CShadow: Word;
+  Db: TDrawBuffer;
+  I, J, Pos: Integer;
+  C: AnsiChar;
 begin
+  { Determine button color based on state }
   if State and sfDisabled <> 0 then
-    CButton := GetColor($0401)
+    Bc := GetColor($0404)
   else begin
-    CButton := GetColor($0501);
-    if State and sfActive <> 0 then
-      if State and sfFocused <> 0 then
-        CButton := GetColor($0703)
+    Bc := GetColor($0501);
+    if State and sfActive <> 0 then begin
+      if State and sfSelected <> 0 then
+        Bc := GetColor($0703)
       else if AmDefault then
-        CButton := GetColor($0602);
-  end;
-  CShadow := GetColor(8);
-  S := Size.X - 1;
-  T := (Size.X - Length(Title^) - 4) div 2;
-  if Down then begin
-    Ch := ' ';
-    Inc(T);
-  end else
-    Ch := #0;
-
-  for Y := 0 to Size.Y - 2 do begin
-    MoveChar(B, ' ', CButton, Size.X);
-    MoveChar(B[S], #220, CShadow, 1);
-    if (Y = 0) and not Down then
-      MoveStr(B, #222, Byte(CButton) shr 8);
-    if (Y = Size.Y - 2) and not Down then begin
-      if Title <> nil then
-        TitleStr := Title^
-      else
-        TitleStr := '';
-      CText := CButton;
-      MoveChar(B[1], ' ', CButton, T);
-      MoveChar(B[T + 1], '[', CButton, 1);
-      MoveStr(B[T + 2], TitleStr, CText);
-      MoveChar(B[T + Length(TitleStr) + 2], ']', CButton, 1);
+        Bc := GetColor($0602);
     end;
-    WriteLine(0, Y, Size.X, 1, B);
   end;
 
-  MoveChar(B, #223, CShadow, Size.X);
-  MoveChar(B[0], ' ', CButton, 1);
-  WriteLine(0, Size.Y - 1, Size.X, 1, B);
+  CShadow := GetColor(8);
+
+  { Handle empty title case }
+  if Title = nil then begin
+    MoveChar(Db[0], ' ', Byte(CShadow), 1);
+    for J := Ord(Down) to Size.X - 2 do
+      MoveChar(Db[J], ' ', Byte(Bc), 1);
+  end
+  else begin
+    { We have a title }
+    if Flags and bfLeftJust = 0 then begin
+      I := CStrLen(Title^);
+      I := (Size.X - I) div 2;
+    end
+    else
+      I := 1;
+
+    if Down then begin
+      MoveChar(Db[0], ' ', Byte(CShadow), 1);
+      Pos := 1;
+    end
+    else
+      Pos := 0;
+
+    { Fill before title }
+    for J := 0 to I - 1 do
+      MoveChar(Db[Pos + J], ' ', Byte(Bc), 1);
+
+    { Draw title }
+    MoveCStr(Db[I + Pos], Title^, Bc);
+
+    { Fill after title }
+    for J := Pos + CStrLen(Title^) + I to Size.X - 2 do
+      MoveChar(Db[J], ' ', Byte(Bc), 1);
+  end;
+
+  { Last column of row 0 }
+  if not Down then begin
+    { When not down: put ▄ at rightmost column for shadow effect }
+    if Size.Y > 1 then
+      MoveChar(Db[Size.X - 1], #220, Byte(CShadow), 1)  { ▄ }
+    else
+      MoveChar(Db[Size.X - 1], ' ', Byte(CShadow), 1);
+  end
+  else begin
+    { When down: rightmost column is button color }
+    MoveChar(Db[Size.X - 1], ' ', Byte(Bc), 1);
+  end;
+
+  { Write row 0 }
+  WriteLine(0, 0, Size.X, 1, Db);
+
+  { Handle second row if button height > 1 }
+  if Size.Y > 1 then begin
+    { Build bottom shadow row }
+    MoveChar(Db[0], ' ', Byte(CShadow), 1);
+    if Down then
+      C := ' '
+    else
+      C := #223;  { ▀ upper half block }
+    MoveChar(Db[1], C, Byte(CShadow), Size.X - 1);
+    WriteLine(0, 1, Size.X, 1, Db);
+  end;
 end;
 
 procedure TButton.MakeDefault(Enable: Boolean);
@@ -893,17 +927,17 @@ end;
 
 procedure TCluster.DrawBox(const Icon: ShortString; Marker: AnsiChar);
 var
-  I, J, Cur, Col, CNorm, CSel, CDis, Color: Integer;
+  I, J, Cur, Col: Integer;
+  CNorm, CSel, CDis, Color: Word;
   B: TDrawBuffer;
-  SCOff: Byte;
   S: ShortString;
 begin
   CNorm := GetColor($0301);
   CSel := GetColor($0402);
-  CDis := GetColor(5);
+  CDis := GetColor($0505);
 
   for I := 0 to Size.Y - 1 do begin
-    MoveChar(B, ' ', CNorm, Size.X);
+    MoveChar(B, ' ', Byte(CNorm), Size.X);
     Col := 0;
     for J := 0 to (Strings.Count - 1) div Size.Y do begin
       Cur := J * Size.Y + I;
@@ -915,13 +949,13 @@ begin
         else
           Color := CNorm;
 
-        MoveStr(B[Col], Icon, Color);
+        MoveStr(B[Col], Icon, Byte(Color));
         if Mark(Cur) then
           WordRec(B[Col + 2]).Lo := Byte(Marker);
 
         S := PShortString(Strings.At(Cur))^;
-        MoveStr(B[Col + Length(Icon)], S, Color);
-        Inc(Col, Length(Icon) + Length(S) + 2);
+        MoveCStr(B[Col + Length(Icon)], S, Color);
+        Inc(Col, Length(Icon) + CStrLen(S) + 2);
       end;
     end;
     WriteLine(0, I, Size.X, 1, B);
@@ -1311,10 +1345,9 @@ end;
 
 procedure TLabel.Draw;
 var
-  Color: Byte;
+  Color: Word;
   B: TDrawBuffer;
   SCOff: Byte;
-  I: Integer;
   S: ShortString;
 begin
   if Light then begin
@@ -1324,10 +1357,10 @@ begin
     Color := GetColor($0301);
     SCOff := 4;
   end;
-  MoveChar(B, ' ', Color, Size.X);
+  MoveChar(B, ' ', Byte(Color), Size.X);
   if Text <> nil then begin
     S := Text^;
-    MoveStr(B, S, Color);
+    MoveCStr(B[1], S, Color);
     if ShowMarkers then begin
       WordRec(B[0]).Lo := Byte(SpecialChars[SCOff]);
     end;

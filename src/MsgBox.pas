@@ -69,7 +69,7 @@ resourcestring
   sWarning = 'Warning';
   slYes = '~Y~es';
   slNo = '~N~o';
-  slOk = 'O~k~';
+  slOk = '~O~k';
   slCancel = 'Cancel';
 
 function MessageBox(const Msg: string; Params: Pointer; AOptions: Word): Word;

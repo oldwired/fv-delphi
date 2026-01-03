@@ -542,28 +542,43 @@ end;
 function TView.GetColor(Color: Word): Word;
 var
   P: PPalette;
-  V: PView;
-  C: Byte;
-  PLen: Byte;
+  Q: PView;
+  ColLo, ColHi: Byte;
 begin
-  Result := Color;
-  V := @Self;
-  while V <> nil do begin
-    P := V^.GetPalette;
-    if P <> nil then begin
-      PLen := Length(P^);
-      if (Lo(Color) > 0) and (Lo(Color) <= PLen) then begin
-        C := Ord(P^[Lo(Color)]);
-        if C = 0 then C := ErrorAttr;
-        Result := (Result and $FF00) or C;
+  Result := 0;
+
+  { Map Hi byte through palette chain }
+  if Hi(Color) > 0 then begin
+    ColHi := Hi(Color);
+    Q := @Self;
+    repeat
+      P := Q^.GetPalette;
+      if P <> nil then begin
+        if ColHi <= Length(P^) then
+          ColHi := Ord(P^[ColHi])
+        else
+          ColHi := ErrorAttr;
       end;
-      if (Hi(Color) > 0) and (Hi(Color) <= PLen) then begin
-        C := Ord(P^[Hi(Color)]);
-        if C = 0 then C := ErrorAttr;
-        Result := (Result and $00FF) or (Word(C) shl 8);
+      Q := Q^.Owner;
+    until Q = nil;
+    Result := Word(ColHi) shl 8;
+  end;
+
+  { Map Lo byte through palette chain }
+  if Lo(Color) > 0 then begin
+    ColLo := Lo(Color);
+    Q := @Self;
+    repeat
+      P := Q^.GetPalette;
+      if P <> nil then begin
+        if ColLo <= Length(P^) then
+          ColLo := Ord(P^[ColLo])
+        else
+          ColLo := ErrorAttr;
       end;
-    end;
-    V := V^.Owner;
+      Q := Q^.Owner;
+    until Q = nil;
+    Result := Result or ColLo;
   end;
 end;
 

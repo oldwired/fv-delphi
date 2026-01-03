@@ -367,7 +367,7 @@ resourcestring
   slDirectoryTree = 'Directory ~t~ree';
   slFiles = '~F~iles';
   slName = '~N~ame';
-  slOk = 'O~K~';
+  slOk = '~O~K';
   slOpen = '~O~pen';
   slReplace = '~R~eplace';
   slRevert = '~R~evert';

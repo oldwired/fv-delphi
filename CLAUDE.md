@@ -14,9 +14,9 @@ The original sourcecode for free vision is in C:\temp\fpc\fpc\packages\fv refere
 
 ## Build Commands
 
-Building/Compiling happens by the user until further notice
+Use the MCP build tool:
 
-The project is configured for Win32, Debug/Release configurations in `FVTest.dproj`.
+`mcp__dbuildmcp__msbuild with projectfile="C:/projects/fv-delphi/FVTest.dproj"`
 
 ## Testing
 
