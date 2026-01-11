@@ -5,14 +5,10 @@
 
 unit Objects;
 
-{$I platform.inc}
-
 interface
 
 uses
-  {$IFDEF OS_WINDOWS}
   Winapi.Windows,
-  {$ENDIF}
   System.SysUtils, System.Classes;
 
 const

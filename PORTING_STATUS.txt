@@ -14,7 +14,6 @@ Legend:
 CORE UNITS
 ==============================================================================
 
-[X] platform.inc     - Compiler/platform detection defines
 [X] FVCommon.pas     - Common types (Sw_Word, Sw_String, etc.)
 [X] fvconsts.pas     - Constants and resource strings
 [X] Objects.pas      - Base object system, streams, collections
@@ -227,7 +226,7 @@ NOT YET PORTED - OPTIONAL/MAY NOT BE NEEDED
     [ ] TResourceFile
     [ ] TResourceCollection
     [ ] TStrIndexRec, TStrIndex
-    (May not be needed - alternative approaches available)
+    (Whole serialization handling not ported. May not be needed - alternative approaches available)
 
 [ ] SysMsg.pas       - System message handling
     [ ] TSystemMessage, TSystemEvent
@@ -290,20 +289,6 @@ KNOWN ISSUES
    correctly when files are saved/loaded with UTF-8 encoding (modern Notepad
    default). Workaround: Use ANSI encoding in external editors.
 
-==============================================================================
-FUTURE ENHANCEMENTS (Priority Order)
-==============================================================================
-
-1. UTF-8 encoding support (HIGH PRIORITY)
-   - Required for REST/JSON payloads (API communication)
-   - Required for modern file interoperability
-   - Implementation:
-     * Add UTF8ToAnsi / AnsiToUTF8 conversion utilities
-     * TFileEditor: Detect UTF-8 BOM on load, convert on load/save
-     * Add encoding option to file dialogs
-     * Ensure JSON data is properly encoded/decoded for REST APIs
-
-2. Conversion Class-Syntax
 
 ==============================================================================
 RECENT FIXES (December 2025)

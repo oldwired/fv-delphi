@@ -5,8 +5,6 @@
 
 unit StdDlg;
 
-{$I platform.inc}
-
 interface
 
 uses

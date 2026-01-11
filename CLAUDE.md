@@ -51,12 +51,6 @@ The test app exercises all ported widgets through menu options (Test menu). Debu
 - **TimedDlg.pas** - Auto-closing dialogs
 - **ColorTxt.pas, InpLong.pas, AsciiTab.pas** - Specialized widgets
 
-### Platform Abstraction
-`src/platform.inc` handles compiler/platform detection. Key defines:
-- `PPC_DELPHI` / `PPC_FPC` - Compiler type
-- `BIT_32` / `BIT_64` - Architecture
-- `OS_WINDOWS` - Target OS
-
 ## Code Conventions
 
 ### Type System
@@ -67,8 +61,7 @@ The test app exercises all ported widgets through menu options (Test menu). Debu
 
 ### Compiler Directives
 - Range checking OFF (`{$R-}`) in units with pointer arithmetic
-- Warnings suppressed for legacy patterns (see platform.inc)
-- Include `{$I platform.inc}` at the top of source units
+- This is a Delphi-only project targeting Windows
 
 ### Memory Management
 - Views are owned by their parent `TGroup` and disposed automatically

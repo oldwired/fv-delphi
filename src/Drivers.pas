@@ -5,14 +5,10 @@
 
 unit Drivers;
 
-{$I platform.inc}
-
 interface
 
 uses
-  {$IFDEF OS_WINDOWS}
   Winapi.Windows,
-  {$ENDIF}
   System.SysUtils,
   Objects, Video, fvconsts;
 

@@ -5,14 +5,10 @@
 
 unit App;
 
-{$I platform.inc}
-
 interface
 
 uses
-  {$IFDEF OS_WINDOWS}
   Winapi.Windows,
-  {$ENDIF}
   System.SysUtils,
   Objects, Drivers, Views, Menus, Dialogs, HistList, fvconsts;
 

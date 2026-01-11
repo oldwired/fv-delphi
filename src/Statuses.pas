@@ -16,8 +16,6 @@
 
 unit Statuses;
 
-{$I platform.inc}
-
 interface
 
 uses

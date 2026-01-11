@@ -13,8 +13,6 @@
 
 unit InpLong;
 
-{$I platform.inc}
-
 interface
 
 uses

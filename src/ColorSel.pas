@@ -12,8 +12,6 @@
 
 unit ColorSel;
 
-{$I platform.inc}
-
 interface
 
 uses

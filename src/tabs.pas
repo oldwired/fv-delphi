@@ -11,8 +11,6 @@
 
 unit Tabs;
 
-{$I platform.inc}
-
 interface
 
 uses

@@ -5,15 +5,12 @@
 
 unit Dialogs;
 
-{$I platform.inc}
 {$R-}
 
 interface
 
 uses
-  {$IFDEF OS_WINDOWS}
   Winapi.Windows,
-  {$ENDIF}
   System.SysUtils,
   FVCommon, Objects, Drivers, Views, fvconsts, Validate, HistList;
 

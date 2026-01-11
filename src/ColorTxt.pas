@@ -15,8 +15,6 @@
 
 unit ColorTxt;
 
-{$I platform.inc}
-
 interface
 
 uses

@@ -5,8 +5,6 @@
 
 unit Calendar;
 
-{$I platform.inc}
-
 interface
 
 uses

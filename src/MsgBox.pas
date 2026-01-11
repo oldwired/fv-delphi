@@ -5,8 +5,6 @@
 
 unit MsgBox;
 
-{$I platform.inc}
-
 interface
 
 uses

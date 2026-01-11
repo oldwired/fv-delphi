@@ -12,8 +12,6 @@
 
 unit Editors;
 
-{$I platform.inc}
-
 {$X+,R-,Q-}
 
 interface

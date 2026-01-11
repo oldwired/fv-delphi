@@ -10,8 +10,6 @@
 
 unit AsciiTab;
 
-{$I platform.inc}
-
 interface
 
 uses

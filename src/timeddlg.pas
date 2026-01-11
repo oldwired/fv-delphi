@@ -11,8 +11,6 @@
 
 unit TimedDlg;
 
-{$I platform.inc}
-
 interface
 
 uses

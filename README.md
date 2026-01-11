@@ -107,8 +107,8 @@ See `PORTING_STATUS.txt` for detailed porting status and known issues.
 
 ## Known Limitations
 
-1. **Console Resize**: Window resize events are not handled (may cause visual artifacts)
-2. **ANSI Encoding**: Editor uses ANSI encoding; UTF-8 files may not display correctly
+1. **ANSI Encoding**: Editor, like rest of FV uses ANSI encoding; UTF-8 files may not display correctly
+2. **Ressource based Serialization**: Not ported, stubs and rudiments still present
 3. New **edge-cases**, **oversights** or **errors** may be introduced in this project
 
 ## License

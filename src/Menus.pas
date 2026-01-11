@@ -5,15 +5,12 @@
 
 unit Menus;
 
-{$I platform.inc}
 {$R-}  { Disable range checking for legacy buffer operations }
 
 interface
 
 uses
-  {$IFDEF OS_WINDOWS}
   Winapi.Windows,
-  {$ENDIF}
   System.SysUtils,
   Objects, Drivers, Views, fvconsts;
 

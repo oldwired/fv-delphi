@@ -5,8 +5,6 @@
 
 unit HistList;
 
-{$I platform.inc}
-
 interface
 
 uses

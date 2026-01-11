@@ -5,14 +5,10 @@
 
 unit FVCommon;
 
-{$I platform.inc}
-
 interface
 
 uses
-  {$IFDEF OS_WINDOWS}
   Winapi.Windows,
-  {$ENDIF}
   System.SysUtils;
 
 {***************************************************************************}

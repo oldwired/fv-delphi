@@ -12,8 +12,6 @@
 
 unit Gadgets;
 
-{$I platform.inc}
-
 interface
 
 uses

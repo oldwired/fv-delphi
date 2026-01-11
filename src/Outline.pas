@@ -16,8 +16,6 @@
 
 unit Outline;
 
-{$I platform.inc}
-
 interface
 
 uses

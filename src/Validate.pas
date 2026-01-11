@@ -5,7 +5,6 @@
 
 unit Validate;
 
-{$I platform.inc}
 {$R-}
 
 interface
