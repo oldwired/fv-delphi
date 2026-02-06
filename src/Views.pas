@@ -1041,7 +1041,6 @@ var
   ClipRight: Integer;
   ClipLeft, ClipTop, ClipBottom: Integer;
   XOffset: Integer;
-  FrameInset: Integer;
 begin
   if (State and sfExposed) <> 0 then begin
     if (W <= 0) or (H <= 0) then Exit;
@@ -1058,19 +1057,10 @@ begin
         { Walk up the owner chain, checking clip at each level }
         V := Owner;
         while V <> nil do begin
-          { Inset clip by 1 for framed views (windows) - but not for the frame itself }
-          { Frame child is detected by: view is at (0,0) with same size as owner }
-          { Only apply inset if owner has ofFramed flag set }
-          FrameInset := 0;
-          if (V = Owner) and ((V^.Options and ofFramed) <> 0) and
-             ((Origin.X <> 0) or (Origin.Y <> 0) or
-             (Size.X <> V^.Size.X) or (Size.Y <> V^.Size.Y)) then
-            FrameInset := 1;
-
-          ClipTop := PGroup(V)^.Clip.A.Y + FrameInset;
-          ClipBottom := PGroup(V)^.Clip.B.Y - FrameInset;
-          ClipLeft := PGroup(V)^.Clip.A.X + FrameInset;
-          ClipRight := PGroup(V)^.Clip.B.X - FrameInset;
+          ClipTop := PGroup(V)^.Clip.A.Y;
+          ClipBottom := PGroup(V)^.Clip.B.Y;
+          ClipLeft := PGroup(V)^.Clip.A.X;
+          ClipRight := PGroup(V)^.Clip.B.X;
 
           { Check vertical clipping }
           if (GY < ClipTop) or (GY >= ClipBottom) then begin
