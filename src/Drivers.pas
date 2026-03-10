@@ -188,7 +188,6 @@ type
 {***************************************************************************}
 
 function GetDosTicks: LongInt;
-procedure GiveUpTimeSlice;
 
 { Buffer move routines }
 function StrWidth(const S: ShortString): Integer;
@@ -402,10 +401,6 @@ begin
   Result := GetTickCount div 55;
 end;
 
-procedure GiveUpTimeSlice;
-begin
-  SleepEx(10, True);
-end;
 
 function StrWidth(const S: ShortString): Integer;
 begin
@@ -850,7 +845,7 @@ begin
   EventsInitialized := False;
 end;
 
-procedure GetEvent(var Event: TEvent);
+procedure PollEventSources(var Event: TEvent);
 begin
   if QueueCount > 0 then begin
     NextQueuedEvent(Event);
@@ -861,6 +856,22 @@ begin
   GetMouseEvent(Event);
   if Event.What <> evNothing then Exit;
   GetSystemEvent(Event);
+end;
+
+procedure GetEvent(var Event: TEvent);
+begin
+  PollEventSources(Event);
+  if Event.What <> evNothing then
+    Exit;
+
+  { Prevent a hot idle spin: wait briefly for new console input (or APCs),
+    then poll once more before returning evNothing to the app idle loop. }
+  if (ConsoleInput <> 0) and (ConsoleInput <> INVALID_HANDLE_VALUE) then
+    WaitForSingleObjectEx(ConsoleInput, 10, True)
+  else
+    SleepEx(10, True);
+
+  PollEventSources(Event);
 end;
 
 procedure PutEvent(var Event: TEvent);
